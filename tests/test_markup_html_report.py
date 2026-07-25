@@ -101,9 +101,12 @@ def test_render_html_report_add_delta_has_no_box_a(tmp_path):
 
 
 def test_render_html_report_unclassified_visual_change_has_no_box_either_side(tmp_path):
-    """raster_recall.py deltas carry a zone but no id_a/id_b -- the report
-    must still list them (with a "no exact location" note client-side),
-    not silently drop them the way it would if it only iterated boxes."""
+    """A Delta with no id_a/id_b AND no bbox_a/bbox_b set (the shape this
+    kind had before raster_join.py started carrying a real bbox) -- the
+    report must still list it (with a "no exact location" note
+    client-side), not silently drop it the way it would if it only
+    iterated element-resolved boxes. See the sibling test below for the
+    now-common case where bbox_a/bbox_b ARE set."""
     raster_a = _blank_png(tmp_path / "a1.png")
     raster_b = _blank_png(tmp_path / "b1.png")
     doc_a = _doc("A", [], {1: raster_a})
@@ -120,6 +123,31 @@ def test_render_html_report_unclassified_visual_change_has_no_box_either_side(tm
     assert rec["kind"] == "unclassified_visual_change"
     assert rec["box_a"] is None and rec["box_b"] is None
     assert rec["zone"] == "C-4"
+
+
+def test_render_html_report_unclassified_visual_change_uses_its_own_bbox(tmp_path):
+    """The now-common case: raster_join.py sets bbox_a/bbox_b directly on
+    the Delta (no CanonicalElement to resolve, but a real region was
+    found) -- the report should use that as the box location, not fall
+    back to "no exact location" just because there's no id_a/id_b."""
+    raster_a = _blank_png(tmp_path / "a1.png")
+    raster_b = _blank_png(tmp_path / "b1.png")
+    doc_a = _doc("A", [], {1: raster_a})
+    doc_b = _doc("B", [], {1: raster_b})
+    deltas = [Delta("raster0001", "unclassified_visual_change", "unclassified_visual_change", None, None,
+                     1, "C-4", "C-4", {"tags": ["26GT9143"]}, confidence=0.3,
+                     description="graphical change near 26GT9143; not characterized by text engine",
+                     bbox_a=BBox(0.4, 0.4, 0.6, 0.6), bbox_b=BBox(0.4, 0.4, 0.6, 0.6),
+                     visual_change_kind="graphical")]
+
+    out_path = tmp_path / "report.html"
+    render_html_report(doc_a, doc_b, deltas, "A", "B", str(out_path))
+    data = _extract_embedded(out_path.read_text(), "DATA")
+
+    rec = data["deltas"][0]
+    assert rec["box_a"] == [0.4, 0.4, 0.6, 0.6]
+    assert rec["box_b"] == [0.4, 0.4, 0.6, 0.6]
+    assert rec["visual_change_kind"] == "graphical"
 
 
 def test_render_html_report_cascade_and_semantic_null_flags_survive_to_the_record(tmp_path):

@@ -18,15 +18,28 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Literal, Optional
 
+from src.canonical.model import BBox
+
 DeltaKind = Literal["add", "remove", "modify", "move", "unclassified_visual_change"]
-# unclassified_visual_change: src/delta/raster_recall.py's opt-in (
-# DELTA_RASTER_RECALL=1) confidence-gated fallback -- a registered raster
-# diff found visual content that never became a CanonicalElement at all
-# (unlike a false positive from garbage OCR text, this is the opposite
-# failure: real content extraction missed entirely). Always low
-# confidence, never scored through eval/metrics.py's per-kind P/R/F1 (no
-# clean GT counterpart to match against by construction) -- reported as
-# its own count in the eval scorecard instead.
+# graphical: identical tag/annotation text on both sides, but the drawn
+# symbol changed (e.g. a valve's glyph swapped) -- the case a text-only
+# pipeline is structurally blind to.
+# geometry: no text-bearing element found near the region on either side
+# -- a pure vector-graphics change (e.g. a line reroute).
+# extraction_gap: text found on only one side, or non-matching text on
+# both -- this SHOULD have been a symbolic add/remove/modify and wasn't;
+# a diagnostic signal about the text pipeline, not just a graphical one.
+VisualChangeKind = Literal["graphical", "geometry", "extraction_gap"]
+# unclassified_visual_change: emitted by src/delta/raster_join.py, fed by
+# src/delta/raster_diff.py's opt-in (DELTA_RASTER_DIFF=1) registered
+# raster-diff region proposal -- residue the symbolic (text) pipeline
+# could not explain. "Raster localizes, symbolic classifies": the region
+# proposal never knows about symbolic deltas, and raster_join.py only
+# ever uses them to SUPPRESS an already-explained region, never to help
+# itself explain one. Always low confidence, never scored through
+# eval/metrics.py's per-kind P/R/F1 (no clean GT counterpart to match
+# against by construction) -- reported as its own count in the eval
+# scorecard instead.
 
 
 @dataclass
@@ -47,6 +60,15 @@ class Delta:
     severity: Optional[str] = None   # set by src/delta/severity.py; None until annotated
     semantic_null: bool = False              # set by src/delta/semantic_null.py; opt-in pass
     semantic_null_reason: Optional[str] = None
+    # bbox_a/bbox_b: only ever set by src/delta/raster_join.py, for
+    # unclassified_visual_change deltas -- these have no id_a/id_b (no
+    # CanonicalElement to look up), unlike every symbolic delta, whose
+    # bbox is always resolved via id_a/id_b against the element it
+    # matched (see markup/overlay.py::_collect_boxes for that existing
+    # pattern, unchanged by this addition).
+    bbox_a: Optional[BBox] = None
+    bbox_b: Optional[BBox] = None
+    visual_change_kind: Optional[VisualChangeKind] = None
 
     def to_dict(self) -> dict:
         return asdict(self)

@@ -110,6 +110,30 @@ def test_render_pdf_markup_cascade_gets_no_fill(tmp_path):
     assert annots_b[0].colors["fill"] == []  # cascade: outline only, no fill
 
 
+def test_render_pdf_markup_annotates_unclassified_visual_change(tmp_path):
+    pdf_a = _blank_pdf(tmp_path / "a.pdf")
+    pdf_b = _blank_pdf(tmp_path / "b.pdf")
+    doc_a = _doc("A", [])
+    doc_b = _doc("B", [])
+    deltas = [Delta("raster0001", "unclassified_visual_change", "unclassified_visual_change",
+                     None, None, 1, "F-6", "F-6", {}, confidence=0.3,
+                     description="graphical change near 26GT9143; not characterized by text engine",
+                     bbox_a=BBox(0.4, 0.4, 0.6, 0.6), bbox_b=BBox(0.4, 0.4, 0.6, 0.6),
+                     visual_change_kind="graphical")]
+
+    out_a, out_b = render_pdf_markup(doc_a, doc_b, deltas, pdf_a, pdf_b, str(tmp_path / "out"))
+
+    for out_path in (out_a, out_b):
+        doc, page, annots = _first_page_annots(out_path)
+        # one rect annotation (the dashed violet box) + one freetext ("?" marker)
+        assert len(annots) == 2
+        rect_annot = next(a for a in annots if a.type[1] == "Square")
+        marker_annot = next(a for a in annots if a.type[1] == "FreeText")
+        assert rect_annot.info["content"] == deltas[0].description
+        assert marker_annot.info["content"] == deltas[0].description
+        assert rect_annot.border["style"] == "D"  # dashed
+
+
 def test_render_pdf_markup_handles_degenerate_zero_area_bbox(tmp_path):
     """A perfectly horizontal or vertical geom_line has a zero-width or
     zero-height bbox by construction (pdf_native.py's own docstring: a

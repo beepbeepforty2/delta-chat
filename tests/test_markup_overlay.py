@@ -97,6 +97,31 @@ def test_render_markup_add_only_appears_on_b(tmp_path):
                for x in range(200, 400, 5) for y in range(150, 250, 5))
 
 
+def test_render_markup_draws_dashed_box_for_unclassified_visual_change(tmp_path):
+    raster_a = _blank_png(tmp_path / "a1.png", size=(200, 200))
+    raster_b = _blank_png(tmp_path / "b1.png", size=(200, 200))
+    doc_a = _doc("A", [], {1: raster_a})
+    doc_b = _doc("B", [], {1: raster_b})
+    # Positioned away from the legend's fixed top-left footprint (same
+    # pitfall other tests in this file already work around -- the panel
+    # is tall enough now (5 legend items) to cover a naive top-left box).
+    deltas = [Delta("raster0001", "unclassified_visual_change", "unclassified_visual_change",
+                     None, None, 1, "F-6", "F-6", {}, confidence=0.3,
+                     description="graphical change; not characterized by text engine",
+                     bbox_a=BBox(0.6, 0.6, 0.8, 0.8), bbox_b=BBox(0.6, 0.6, 0.8, 0.8),
+                     visual_change_kind="graphical")]
+
+    paths_a, paths_b = render_markup(doc_a, doc_b, deltas, str(tmp_path / "out"))
+    img_a = Image.open(paths_a[1])
+    img_b = Image.open(paths_b[1])
+    # drawn on BOTH sides (no id_a/id_b to say which side "owns" it)
+    violet = COLORS["unclassified_visual_change"]
+    for img in (img_a, img_b):
+        found = any(img.getpixel((x, y))[:3] == violet
+                    for x in range(115, 165) for y in range(115, 125))
+        assert found, "expected a violet dashed box near the region's top edge"
+
+
 def test_render_markup_covers_every_sheet_even_without_deltas(tmp_path):
     raster_a = _blank_png(tmp_path / "a1.png")
     raster_b = _blank_png(tmp_path / "b1.png")

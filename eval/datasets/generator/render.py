@@ -24,6 +24,25 @@ from .model import Sheet
 MM2PT = mm  # reportlab unit
 
 
+def _draw_valve_symbol_pdf(c, x_mm: float, y_mm: float, symbol_type: str) -> None:
+    """A crude but distinguishable gate-valve "bowtie" glyph (two
+    triangles meeting at a point -- the same real-vendor convention
+    documented in data/samples/real_pair_valves/PROVENANCE.md), plus a
+    circle for "globe" valves. Offset ~8mm left of/above the tag's own
+    anchor: deliberately close-but-non-overlapping with the tag TEXT's
+    own extracted bbox, matching real P&ID drafting layout -- this is
+    exactly why src/delta/raster_join.py pads its text-proximity check
+    (cfg.tag_proximity_norm) rather than requiring exact bbox overlap."""
+    cx, cy = (x_mm - 8) * MM2PT, (y_mm + 1.5) * MM2PT
+    s = 3.0 * MM2PT
+    p = c.beginPath()
+    p.moveTo(cx - s, cy - s); p.lineTo(cx - s, cy + s); p.lineTo(cx, cy); p.close()
+    p.moveTo(cx + s, cy - s); p.lineTo(cx + s, cy + s); p.lineTo(cx, cy); p.close()
+    c.drawPath(p, fill=1, stroke=1)
+    if symbol_type == "globe":
+        c.circle(cx, cy, s * 0.6, fill=0, stroke=1)
+
+
 def render_pdf(sheet: Sheet, path: str, producer: str = "standard") -> None:
     c = rl_canvas.Canvas(path, pagesize=(sheet.width * MM2PT, sheet.height * MM2PT))
     font = "Helvetica" if producer == "standard" else "Courier"
@@ -42,6 +61,16 @@ def render_pdf(sheet: Sheet, path: str, producer: str = "standard") -> None:
         elif el.role == "geom_circle":
             c.setLineWidth(0.9)
             c.circle(x * MM2PT, y * MM2PT, el.attrs["r"] * MM2PT)
+        elif el.role == "valve_tag":
+            _draw_valve_symbol_pdf(c, x, y, el.attrs.get("symbol_type", "gate"))
+            c.setFont(font, el.font_mm * MM2PT)
+            if producer == "standard":
+                c.drawString(x * MM2PT, y * MM2PT, el.text)
+            else:
+                cx = x
+                for w in el.text.split(" "):
+                    c.drawString(cx * MM2PT, y * MM2PT, w)
+                    cx += (len(w) + 1) * el.font_mm * 0.62
         elif el.text:
             c.setFont(font, el.font_mm * MM2PT)
             if producer == "standard":
@@ -53,6 +82,18 @@ def render_pdf(sheet: Sheet, path: str, producer: str = "standard") -> None:
                     cx += (len(w) + 1) * el.font_mm * 0.62
     c.showPage()
     c.save()
+
+
+def _draw_valve_symbol_dxf(msp, x_mm: float, y_mm: float, symbol_type: str, layer: str) -> None:
+    """DXF equivalent of _draw_valve_symbol_pdf -- same glyph, same offset."""
+    cx, cy = x_mm - 8, y_mm + 1.5
+    s = 3.0
+    msp.add_lwpolyline([(cx - s, cy - s), (cx - s, cy + s), (cx, cy)], close=True,
+                        dxfattribs={"layer": layer})
+    msp.add_lwpolyline([(cx + s, cy - s), (cx + s, cy + s), (cx, cy)], close=True,
+                        dxfattribs={"layer": layer})
+    if symbol_type == "globe":
+        msp.add_circle((cx, cy), s * 0.6, dxfattribs={"layer": layer})
 
 
 def render_dxf(sheet: Sheet, path: str) -> None:
@@ -69,6 +110,10 @@ def render_dxf(sheet: Sheet, path: str) -> None:
                          dxfattribs={"layer": el.layer})
         elif el.role == "geom_circle":
             msp.add_circle((x, y), el.attrs["r"], dxfattribs={"layer": el.layer})
+        elif el.role == "valve_tag":
+            _draw_valve_symbol_dxf(msp, x, y, el.attrs.get("symbol_type", "gate"), el.layer)
+            msp.add_text(el.text, dxfattribs={"layer": el.layer, "height": el.font_mm,
+                                              "insert": (x, y)})
         elif el.text:
             msp.add_text(el.text, dxfattribs={"layer": el.layer, "height": el.font_mm,
                                               "insert": (x, y)})

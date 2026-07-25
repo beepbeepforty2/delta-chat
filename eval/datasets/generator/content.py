@@ -142,10 +142,15 @@ def make_sheet(rng: random.Random, sheet_no: int = 1, of: int = 1) -> Sheet:
     # valve tags + nozzles -------------------------------------------------
     for k in range(rng.randint(8, 12)):
         body = rng.choice(["BL", "GT", "GB", "CB", "CH"])
+        # symbol_type drives the DRAWN glyph (render.py) -- deliberately
+        # separate from `body`, which is baked into the tag TEXT above;
+        # ops.py::change_valve_symbol flips this attr specifically so the
+        # glyph can change while the tag text stays byte-identical.
         sh.add(Element(f"valve{k:02d}", "valve_tag",
                        f"{rng.choice(['26','40','43'])}{body}{9000 + rng.randint(0, 400)}",
                        (rng.uniform(100, sh.width - 280), rng.uniform(60, sh.height - 60)),
-                       attrs={"body": body}, layer="TEXT", font_mm=2.0))
+                       attrs={"body": body, "symbol_type": rng.choice(["gate", "globe"])},
+                       layer="TEXT", font_mm=2.0))
     noz_base = 4200
     for k in range(rng.randint(6, 10)):
         sh.add(Element(f"noz{k:02d}", "nozzle", f"N{noz_base + k}",

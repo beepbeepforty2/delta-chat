@@ -49,6 +49,28 @@ def match_group(etype: str) -> str:
     return etype
 
 
+def _bucket_key(el: CanonicalElement) -> str:
+    """match_group() alone isn't enough for geometry: every shape --
+    line, circle, rect -- shares the one coarse type "geometry"
+    (src/canonical/classify.py::classify_geometry always returns that
+    type, keying the actual shape only in attrs["geom_kind"]), so
+    match_group("geometry") buckets a triangle edge and a circle
+    together. With ~7 geometry elements per sheet this never mattered;
+    once valve-symbol glyphs (bowties + circles, eval/datasets/generator/
+    render.py) pushed real documents to dozens of geometry elements, the
+    Hungarian matcher started genuinely pairing a line against a circle
+    on producer-variation null pairs (content similarity is always 1.0
+    for empty-content geometry, so shape carries zero cost signal without
+    this) -- confirmed via a live null_prod run producing spurious
+    "geom_kind changed: line -> circle" deltas. Sub-bucketing by
+    geom_kind restores the same "cross-X-was-never-correct" guarantee
+    match_group() already gives every other type."""
+    base = match_group(el.type)
+    if el.type == "geometry":
+        return f"{base}:{el.attrs.get('geom_kind', '?')}"
+    return base
+
+
 @dataclass
 class MatchedPair:
     a: Optional[CanonicalElement]
@@ -138,10 +160,10 @@ def match_elements(sheet_a: Optional[CanonicalSheet], sheet_b: Optional[Canonica
     if sheet_b is None:
         return [MatchedPair(e, None) for e in sheet_a.elements]
 
-    groups = {match_group(e.type) for e in sheet_a.elements} | {match_group(e.type) for e in sheet_b.elements}
+    groups = {_bucket_key(e) for e in sheet_a.elements} | {_bucket_key(e) for e in sheet_b.elements}
     matches: list[MatchedPair] = []
     for group in sorted(groups):
-        pool_a = [e for e in sheet_a.elements if match_group(e.type) == group]
-        pool_b = [e for e in sheet_b.elements if match_group(e.type) == group]
+        pool_a = [e for e in sheet_a.elements if _bucket_key(e) == group]
+        pool_b = [e for e in sheet_b.elements if _bucket_key(e) == group]
         matches.extend(_match_bucket(pool_a, pool_b, transform))
     return matches

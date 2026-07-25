@@ -129,8 +129,9 @@ def score_pair(pred: list[Delta], gt: list[dict]) -> dict:
     # false positive even when match_deltas' fuzzy description matching
     # doesn't happen to pair it with a GT null entry.
     #
-    # unclassified_visual_change (src/delta/raster_recall.py, opt-in) is
-    # also excluded: its kind never matches any GT kind by construction
+    # unclassified_visual_change (src/delta/raster_diff.py +
+    # src/delta/raster_join.py, opt-in) is also excluded: its kind never
+    # matches any GT kind by construction
     # (GT only has add/remove/modify/move), so leaving it in would count
     # every single raster-recall hit as an automatic false positive against
     # a P/R/F1 bar it was never meant to be judged by -- it's reported as

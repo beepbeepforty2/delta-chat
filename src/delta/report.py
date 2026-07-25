@@ -48,7 +48,8 @@ def render_markdown(deltas: list[Delta], pid_a: str, pid_b: str) -> str:
         for d in group:
             loc = d.zone_b or d.zone_a or "?"
             sev_tag = f"[{d.severity.upper()}] " if d.severity else ""
-            lines.append(f"- {sev_tag}**Sheet {d.sheet}, zone {loc}** (confidence {d.confidence:.2f}): {d.description}")
+            hint = f" [{d.visual_change_kind}]" if kind == "unclassified_visual_change" and d.visual_change_kind else ""
+            lines.append(f"- {sev_tag}**Sheet {d.sheet}, zone {loc}**{hint} (confidence {d.confidence:.2f}): {d.description}")
             children = [c for c in cascade if c.primary_did == d.did]
             if children:
                 lines.append(f"  - +{len(children)} related cascade change(s)")

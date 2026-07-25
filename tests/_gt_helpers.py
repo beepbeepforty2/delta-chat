@@ -12,7 +12,24 @@ from generator.model import Sheet  # noqa: E402
 from src.canonical.model import BBox, CanonicalElement, CanonicalSheet
 
 PAIRS_DIR = pathlib.Path(__file__).parent.parent / "eval" / "datasets" / "v0" / "pairs"
+MANIFEST_PATH = pathlib.Path(__file__).parent.parent / "eval" / "datasets" / "v0" / "manifest.jsonl"
 EDITED_PAIRS = [f"edited_{i:03d}" for i in range(6)]
+
+
+def pairs_with_op(op_name: str) -> list[str]:
+    """Which pair_ids actually had `op_name` applied, per the manifest's
+    own recorded ops list -- looked up dynamically rather than hardcoded,
+    since which pair index draws which op depends on CONTENT_OPS' exact
+    length (adding/removing an operator shifts every subsequent rng.choice
+    draw for every pair, not just pairs that use the new operator)."""
+    if not MANIFEST_PATH.exists():
+        return []
+    pair_ids = []
+    for line in MANIFEST_PATH.read_text().splitlines():
+        row = json.loads(line)
+        if op_name in row.get("ops", []):
+            pair_ids.append(row["pair_id"])
+    return pair_ids
 
 ROLE_TO_TYPE = {
     "note": "note", "note_deleted": "note_deleted", "title_field": "title_field",

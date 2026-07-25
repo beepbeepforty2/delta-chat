@@ -29,9 +29,14 @@ eval harness threaded through all of it:
    algorithm) → classification (add/remove/modify/move, on parsed
    structured fields, not raw text) → cascade grouping → severity ranking
    → semantic-null detection (rule + optional isolated LLM adjudication)
-   → an optional confidence-gated raster recall net for content
-   extraction missed entirely. The LLM never sits in this path unless
-   explicitly opted into.
+   → an opt-in registered raster-diff layer that proposes candidate
+   change regions with pure CV (SSIM structural diff, morphology,
+   connected components) and reports only the residue the symbolic
+   pipeline couldn't explain, as low-confidence `unclassified_visual_change`
+   deltas — catching valve/symbol changes at a constant tag, line
+   reroutes, and other purely graphical edits the text-only pipeline is
+   structurally blind to. The LLM never sits in this path unless
+   explicitly opted into (raster recall is pure CV, no LLM either way).
 4. **Report + markup** — a JSON + Markdown delta report, and real PDF
    annotation objects stamped onto each revision (visible in Acrobat's/
    Bluebeam's own markup list, not a flattened image).
@@ -124,12 +129,59 @@ Deterministic delta engine, against the seeded synthetic dataset:
 
 | Level | Precision | Recall | F1 | Notes |
 |---|---|---|---|---|
-| L0 (native) | 1.00 | 0.98 | 0.99 | one `move` case below the confidence/distance threshold |
-| L2 (scanned) | 0.21 | 0.88 | 0.34 | OCR noise costs precision badly; recall holds up |
+| L0 (native) | 0.82 | 0.86 | 0.84 | includes GT rows from `ChangeValveSymbol`/`RerouteLine` the symbolic engine is *designed* to miss (see Raster recall net, below) — those show up as real `modify` false negatives here by construction |
+| L2 (scanned) | 0.13 | 0.77 | 0.23 | OCR noise costs precision badly; recall holds up |
 
 Null pairs (identical / re-rendered / reworded-only content): **0 false
 positives** on any of the three. `not_a_pair` (sibling drawing, not a
 revision): correctly refused, not diffed.
+
+### Raster recall net (`DELTA_RASTER_DIFF=1`, opt-in)
+
+**Raster localizes, symbolic classifies.** A registered raster-diff
+layer (`src/delta/raster_diff.py`) proposes candidate change regions
+using pure CV (SSIM structural diff, morphological cleanup, connected
+components — no LLM anywhere in this stage) in `A`'s frame; a join step
+(`src/delta/raster_join.py`) subtracts out anything the symbolic pipeline
+already explained and emits only the residue, as low-confidence
+`unclassified_visual_change` deltas. The raw diff mask is never emitted
+as deltas directly. This is what catches a valve symbol changing type at
+an unchanged tag, a rerouted line, or any other purely graphical edit
+the text-only pipeline is structurally blind to — and, just as
+importantly, what it explicitly does **not** do: classify *what*
+changed. It locates; it never assigns more than a low, capped confidence
+or a coarse `graphical`/`geometry`/`extraction_gap` hint.
+
+Measured, honestly, not claimed:
+
+| Check | Result |
+|---|---|
+| Registration/tolerance calibration: true self-identical pair (`null_ident_900`, and the real 26-KA-901 vendor PDF vs. itself) | **0** regions |
+| The generator's actual producer-variation null pair (`null_prod_901` — same content, different font/producer) | **71** residue deltas — see below |
+| Recall lift on this dataset's `ChangeValveSymbol`/`RerouteLine` GT rows, raster on vs. off | **0.0** (recall stayed 0.0 both ways on this seed) |
+
+The `null_prod_901` number is a real, honest limitation, not a bug being
+hidden: that pair's ground truth is correctly empty (identical content),
+so there is nothing for the symbolic-explained check to suppress
+against, and a full font substitution (Helvetica → Courier) produces
+real pixel-level differences across the whole page that the raster net
+has no semantic basis to distinguish from an actual change — unlike the
+symbolic layer, which gets this exact case right via content-based fuzzy
+matching (font-invariant by construction). This does not violate the
+null-pair false-positive contract (`unclassified_visual_change` is
+excluded from that count the same way a semantic-null flag is), but it
+is a genuine, stated gap: **this stage is not robust to
+producer/rendering variation the way the symbolic layer is.** The 0.0
+recall lift is a second honest finding: on this dataset's one seed, a
+valve's own drawn glyph is also independently visible to the symbolic
+geometry pipeline (a circle appearing/disappearing when a globe valve
+becomes a gate valve), and that coincidental symbolic delta suppresses
+the raster net's own contribution at the same spot. Full detail on both,
+including the two real bugs this rewrite caught along the way (a
+contrast-normalization bug that fabricated a whole-page false diff on a
+blank page, and a cross-shape matching bug in `align.py` exposed only
+once real content raised geometry density), is in
+[`docs/findings.md`](docs/findings.md).
 
 Chat, all 43 questions across the dataset's `qa.jsonl`:
 
@@ -203,9 +255,11 @@ All 7 planned steps plus the bonus markup deliverable:
 Plus, from a later architecture review: a corrected confidence formula
 with a calibration check, judge/chat backend decoupling, semantic-null
 detection (rule + opt-in LLM), a BM25 domain-alias table, and an opt-in
-raster recall net for scanned-input extraction misses. Full detail on all
-of the above, including what each one's live testing actually caught, is
-in [`docs/findings.md`](docs/findings.md).
+registered raster-diff recall net (see "Raster recall net" above) for
+purely graphical edits — valve symbol changes, line reroutes — the
+text-only pipeline is structurally blind to. Full detail on all of the
+above, including what each one's live testing actually caught, is in
+[`docs/findings.md`](docs/findings.md).
 
 Also: an opt-in interactive HTML report (`--html`, see Quick start) — the
 end-user-facing counterpart to `report.py`'s json/md, reusing
@@ -242,7 +296,7 @@ src/
   ingest/        FormatAdapter seam: pdf_native, pdf_scanned, dwg (real stub)
   canonical/     layered IR (model.py); zones.py, tags.py, classify.py
   delta/         precheck -> register -> align (bipartite matcher) -> classify
-                 -> severity -> semantic_null -> raster_recall -> report
+                 -> severity -> semantic_null -> raster_diff -> raster_join -> report
   cli.py         `run`/`chat`/`markup` subcommands
   chat/          retrieval (BM25 + domain aliases) over PID A + PID B +
                  delta report; llm.py (chat + judge backend seams); cited answers

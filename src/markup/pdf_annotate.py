@@ -34,7 +34,12 @@ import fitz
 
 from src.canonical.model import CanonicalDocument
 from src.delta.model import Delta
-from src.markup.overlay import COLORS, _collect_boxes, _index_elements
+from src.markup.overlay import (
+    COLORS,
+    _collect_boxes,
+    _collect_visual_change_boxes,
+    _index_elements,
+)
 
 PRIMARY_BORDER_WIDTH = 2.5
 CASCADE_BORDER_WIDTH = 1.0
@@ -53,7 +58,7 @@ def _rgb_float(color: tuple[int, int, int]) -> tuple[float, float, float]:
     return (color[0] / 255, color[1] / 255, color[2] / 255)
 
 
-def _annotate_page(page: "fitz.Page", entries: list) -> None:
+def _annotate_page(page: fitz.Page, entries: list) -> None:
     """entries: [(CanonicalElement, Delta)], from overlay.py::_collect_boxes."""
     w, h = page.rect.width, page.rect.height
     page_rect = page.rect
@@ -75,12 +80,46 @@ def _annotate_page(page: "fitz.Page", entries: list) -> None:
         annot.update()
 
 
-def _annotate_document(pdf_path: str, boxes_by_sheet: dict[int, list], out_path: Path) -> str:
+def _annotate_visual_change(page: fitz.Page, d: Delta) -> None:
+    """PDF equivalent of overlay.py's dashed violet box + "?" marker.
+    PyMuPDF's add_rect_annot has no dashed-border option (set_border only
+    controls width) -- the real-annotation equivalent of "visually
+    distinct, not a confident classification" is a solid but otherwise
+    plain (no fill) violet rect, plus a separate small freetext "?"
+    annotation at the region's corner, both carrying the delta's own
+    description/title exactly like every other kind's annotation does."""
+    w, h = page.rect.width, page.rect.height
+    b = d.bbox_a
+    rect = fitz.Rect(b.x0 * w - PAD_PT, b.y0 * h - PAD_PT,
+                      b.x1 * w + PAD_PT, b.y1 * h + PAD_PT) & page.rect
+    color = _rgb_float(COLORS["unclassified_visual_change"])
+    annot = page.add_rect_annot(rect)
+    annot.set_colors(stroke=color)
+    annot.set_opacity(0.9)
+    annot.set_border(width=PRIMARY_BORDER_WIDTH, dashes=[3, 3])
+    annot.set_info(content=d.description or "unclassified visual change",
+                    title="delta-chat: unclassified_visual_change")
+    annot.update()
+
+    marker = page.add_freetext_annot(fitz.Rect(rect.x0, rect.y0, rect.x0 + 14, rect.y0 + 14),
+                                      "?", fontsize=10, text_color=color)
+    marker.set_info(content=d.description or "unclassified visual change",
+                     title="delta-chat: unclassified_visual_change")
+    marker.update()
+
+
+def _annotate_document(pdf_path: str, boxes_by_sheet: dict[int, list], visual_changes_by_sheet: dict[int, list],
+                        out_path: Path) -> str:
     doc = fitz.open(pdf_path)
-    for sheet_no, entries in boxes_by_sheet.items():
+    all_sheets = set(boxes_by_sheet) | set(visual_changes_by_sheet)
+    for sheet_no in all_sheets:
         page_index = sheet_no - 1  # sheet numbers are 1-indexed, page order matches (see pdf_native.py::ingest)
-        if 0 <= page_index < doc.page_count:
-            _annotate_page(doc[page_index], entries)
+        if not (0 <= page_index < doc.page_count):
+            continue
+        page = doc[page_index]
+        _annotate_page(page, boxes_by_sheet.get(sheet_no, []))
+        for d in visual_changes_by_sheet.get(sheet_no, []):
+            _annotate_visual_change(page, d)
     doc.save(str(out_path), garbage=4, deflate=True)
     doc.close()
     return str(out_path)
@@ -96,7 +135,11 @@ def render_pdf_markup(doc_a: CanonicalDocument, doc_b: CanonicalDocument, deltas
     out.mkdir(parents=True, exist_ok=True)
     els_a, els_b = _index_elements(doc_a), _index_elements(doc_b)
     boxes_a, boxes_b = _collect_boxes(deltas, els_a, els_b)
+    # One region, annotated on both revisions -- raster_join.py's residue
+    # has no id_a/id_b, so there's no basis to say it "belongs" to one
+    # side only, unlike a typed add/remove.
+    visual_changes = _collect_visual_change_boxes(deltas)
 
-    out_a = _annotate_document(path_a, boxes_a, out / "markup_a.pdf")
-    out_b = _annotate_document(path_b, boxes_b, out / "markup_b.pdf")
+    out_a = _annotate_document(path_a, boxes_a, visual_changes, out / "markup_a.pdf")
+    out_b = _annotate_document(path_b, boxes_b, visual_changes, out / "markup_b.pdf")
     return out_a, out_b

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
@@ -73,9 +74,9 @@ def aggregate(pair_results: list[dict]) -> dict:
     null_fn = sum(r["semantic_null_detection"]["fn"] for r in pair_results)
     semantic_null_detection = prf1(null_tp, null_fp, null_fn)
 
-    # .get(...) default: raster recall (src/delta/raster_recall.py) is
-    # opt-in and predates this key in some test fixtures -- 0 is always
-    # correct when the pass didn't run.
+    # .get(...) default: raster recall (src/delta/raster_diff.py +
+    # src/delta/raster_join.py) is opt-in and predates this key in some
+    # test fixtures -- 0 is always correct when the pass didn't run.
     n_unclassified_visual_change = sum(r.get("n_unclassified_visual_change", 0) for r in pair_results)
 
     primary_recalls = [r["primary_recall"] for r in pair_results]
@@ -138,8 +139,112 @@ def eval_null_pairs(dataset_dir: Path, manifest: list[dict]) -> dict:
             "n_deltas_emitted": len(deltas),
             "hard_false_positives": score["overall"]["fp"],
             "semantic_null_emission_rate": score["semantic_null_emission_rate"],
+            # The registration/tolerance calibration number raster_diff.py's
+            # own design depends on: a null pair (identical or
+            # producer-re-exported content) should propose/join to ~0
+            # unclassified_visual_change deltas. Only meaningful when
+            # DELTA_RASTER_DIFF=1 -- 0 by construction otherwise (stage
+            # is a no-op when off).
+            "n_raster_regions": sum(1 for d in deltas if d.kind == "unclassified_visual_change"),
         }
     return out
+
+
+_RASTER_ONLY_OPS = ("ChangeValveSymbol", "RerouteLine")
+
+
+def _is_raster_only_gt_row(row: dict) -> bool:
+    fc = row.get("field_changes") or {}
+    if row.get("role") == "valve_tag" and "symbol_type" in fc:
+        return True
+    if row.get("role") == "geom_line" and "dx" in fc and "dy" in fc:
+        return True
+    return False
+
+
+def _gt_row_found(row: dict, deltas: list, gt_zone: str) -> bool:
+    """A qualifying GT row counts as "found" either way a real
+    improvement could show up: (a) a normal symbolic match on the same
+    (kind, sheet, zone) -- covers a future symbolic-side improvement too,
+    not just the raster net; or (b) an unclassified_visual_change delta
+    on the same sheet whose zone matches -- the raster net's own residue
+    has no id_b to align against a GT eid, so zone/sheet is the only
+    correspondence available at this granularity. Zone (not just sheet)
+    is required for the symbolic-match case too: a bare (kind, sheet)
+    check is trivially satisfied by any unrelated "modify" delta
+    elsewhere on the same sheet -- these pairs always have several,
+    since ChangeValveSymbol/RerouteLine are sampled alongside other
+    content ops, not in isolation."""
+    for d in deltas:
+        if d.sheet != row["sheet"]:
+            continue
+        if d.kind == row["kind"] and not d.is_cascade and gt_zone in (d.zone_a, d.zone_b):
+            return True
+        if d.kind == "unclassified_visual_change" and gt_zone in (d.zone_a, d.zone_b):
+            return True
+    return False
+
+
+def eval_raster_recall_pairs(dataset_dir: Path, manifest: list[dict]) -> dict:
+    """Pairs whose edit script included ChangeValveSymbol/RerouteLine --
+    the graphical/geometry GT the symbolic pipeline structurally cannot
+    match by content (tag text or geometry attrs the symbolic side
+    never looks at). score_pair excludes unclassified_visual_change from
+    its own P/R/F1 pool by construction (no clean GT counterpart), so
+    this is a parallel, additive measurement, not a change to
+    score_pair/match_deltas -- runs each qualifying pair twice (raster
+    on/off) and reports the recall difference plus the precision cost."""
+    rows = [r for r in manifest if r["kind"] == "edited"
+            and any(op in r.get("ops", []) for op in _RASTER_ONLY_OPS)]
+
+    prior_env = os.environ.get("DELTA_RASTER_DIFF")
+    results = {"on": {"found": 0, "total": 0, "residue_hits": 0, "residue_total": 0},
+               "off": {"found": 0, "total": 0}}
+    try:
+        for enabled, env_val in (("off", "0"), ("on", "1")):
+            os.environ["DELTA_RASTER_DIFF"] = env_val
+            for row in rows:
+                pair_dir = dataset_dir / "pairs" / row["pair_id"]
+                gt = load_gt_deltas(pair_dir)
+                gt_raster_rows = [g for g in gt if _is_raster_only_gt_row(g)]
+                if not gt_raster_rows:
+                    continue
+                deltas = run_pair_at_level(pair_dir, "L0")
+                for g in gt_raster_rows:
+                    gt_zone = g.get("zone_b") or g.get("zone_a")
+                    results[enabled]["total"] += 1
+                    if _gt_row_found(g, deltas, gt_zone):
+                        results[enabled]["found"] += 1
+                if enabled == "on":
+                    unclassified = [d for d in deltas if d.kind == "unclassified_visual_change"]
+                    gt_zones = {g.get("zone_b") or g.get("zone_a") for g in gt if not g.get("semantic_null")}
+                    results["on"]["residue_total"] += len(unclassified)
+                    results["on"]["residue_hits"] += sum(
+                        1 for d in unclassified if (d.zone_a in gt_zones or d.zone_b in gt_zones))
+    finally:
+        if prior_env is None:
+            os.environ.pop("DELTA_RASTER_DIFF", None)
+        else:
+            os.environ["DELTA_RASTER_DIFF"] = prior_env
+
+    def recall(bucket):
+        return round(bucket["found"] / bucket["total"], 4) if bucket["total"] else None
+
+    recall_on, recall_off = recall(results["on"]), recall(results["off"])
+    residue_precision = (round(results["on"]["residue_hits"] / results["on"]["residue_total"], 4)
+                         if results["on"]["residue_total"] else None)
+    return {
+        "n_pairs": len(rows),
+        "n_gt_raster_only": results["on"]["total"],
+        "recall_on": recall_on,
+        "recall_off": recall_off,
+        "recall_lift": round(recall_on - recall_off, 4) if recall_on is not None and recall_off is not None else None,
+        # Of unclassified_visual_change deltas emitted with raster on, what
+        # fraction overlap (by zone) any real non-null GT delta at all --
+        # the honest precision cost of the recall gain, reported alongside
+        # it rather than hidden.
+        "residue_precision": residue_precision,
+    }
 
 
 def eval_not_a_pair(dataset_dir: Path, manifest: list[dict]) -> dict:
@@ -221,6 +326,7 @@ def run_eval(dataset_dir: Path, levels: list[str], skip_chat: bool = False,
         "levels": levels,
         "edited": eval_edited_pairs(dataset_dir, manifest, levels),
         "null_pairs": eval_null_pairs(dataset_dir, manifest),
+        "raster_recall": eval_raster_recall_pairs(dataset_dir, manifest),
         "not_a_pair": eval_not_a_pair(dataset_dir, manifest),
         "chat": None if skip_chat else eval_chat(dataset_dir, manifest),
         "llm_direct_baseline": None if skip_baseline else eval_llm_direct_baseline(dataset_dir, manifest),
@@ -256,7 +362,21 @@ def print_scorecard(results: dict, diff: dict | None = None) -> None:
     for pair_id, r in results["null_pairs"].items():
         flag = "OK" if r["hard_false_positives"] == 0 else "FAIL"
         extra = f" semantic_null_rate={r['semantic_null_emission_rate']}" if r["semantic_null_emission_rate"] is not None else ""
-        print(f"  {pair_id:20s} [{r['kind']:12s}] hard_fp={r['hard_false_positives']} [{flag}]{extra}")
+        regions = f" raster_regions={r['n_raster_regions']}" if os.environ.get("DELTA_RASTER_DIFF") == "1" else ""
+        print(f"  {pair_id:20s} [{r['kind']:12s}] hard_fp={r['hard_false_positives']} [{flag}]{extra}{regions}")
+    print()
+
+    print("-- raster recall net (raster_diff.py + raster_join.py) --")
+    rr = results["raster_recall"]
+    if not rr["n_pairs"]:
+        print("  no ChangeValveSymbol/RerouteLine pairs in this dataset -- run `make dataset` to regenerate")
+    else:
+        print(f"  {rr['n_pairs']} pair(s), {rr['n_gt_raster_only']} raster-only-catchable GT change(s)")
+        print(f"  recall with raster off: {rr['recall_off']}")
+        print(f"  recall with raster on:  {rr['recall_on']}")
+        print(f"  recall lift:            {rr['recall_lift']}")
+        print(f"  residue precision (of unclassified_visual_change hits that overlap a real GT change): "
+              f"{rr['residue_precision']}")
     print()
 
     print("-- not-a-pair refusal --")

@@ -90,10 +90,23 @@ def test_geometry_count_matches_gt(doc_std, sheet):
     # make_sheet() always emits 6 geom_line (all horizontal, dy=0.0 --
     # regression guard: a horizontal/vertical line's fitz rect has zero
     # area and must not be dropped as "empty") + 1 geom_circle = 7.
+    #
+    # n_extracted is no longer required to equal 7 exactly: every
+    # valve_tag now also renders a real vector glyph (render.py's
+    # _draw_valve_symbol_pdf, a bowtie +/- a circle) that isn't modeled
+    # as a separate geom_line/geom_circle Element in the GT sheet at
+    # all -- unmodeled vector art the ingest adapter still picks up as
+    # "geometry", exactly matching how a real vendor PDF's actual valve
+    # symbols behave (see data/samples/real_pair_valves/PROVENANCE.md,
+    # which documents this same interaction on real content). The
+    # meaningful regression guard is that nothing GT-modeled ever gets
+    # silently dropped -- extraction can only ever find as many or more
+    # geometry elements than the model declares, never fewer.
     n_gt_geom = sum(1 for e in sheet.elements.values()
                      if e.role in ("geom_line", "geom_circle"))
     n_extracted = sum(1 for e in doc_std.sheets[0].elements if e.type == "geometry")
-    assert n_extracted == n_gt_geom == 7
+    assert n_gt_geom == 7
+    assert n_extracted >= n_gt_geom
 
 
 def test_computed_zone_matches_gt_zone(doc_std, sheet):

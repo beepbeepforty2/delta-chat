@@ -6,6 +6,7 @@ from src.delta.model import Delta
 from src.delta.severity import classify_severity
 from src.cli import _resolve_with_pid, compute_deltas
 from src.observability.tracer import Tracer
+from tests._gt_helpers import pairs_with_op
 
 PAIRS_DIR = pathlib.Path(__file__).parent.parent / "eval" / "datasets" / "v0" / "pairs"
 
@@ -93,12 +94,15 @@ def test_real_pair_every_delta_gets_a_severity():
 
 
 def test_real_setpoint_change_pair_is_critical():
-    """edited_003's GT has a real instrument setpoint change
-    (PDIT-9017 HH 235 -> 240) -- confirms the engine's own matched/
-    classified output (not a synthetic Delta) gets tagged critical."""
-    if not (PAIRS_DIR / "edited_003").exists():
+    """Whichever pair actually used ChangeSetpoint (looked up from the
+    manifest, not hardcoded -- which pair index draws which op shifts
+    whenever CONTENT_OPS' length changes) -- confirms the engine's own
+    matched/classified output (not a synthetic Delta) gets tagged
+    critical on a real instrument setpoint change."""
+    pair_ids = pairs_with_op("ChangeSetpoint")
+    if not pair_ids or not (PAIRS_DIR / pair_ids[0]).exists():
         pytest.skip("run `make dataset` first")
-    deltas = _run("edited_003")
+    deltas = _run(pair_ids[0])
     setpoint_deltas = [d for d in deltas if d.element_type == "instrument"
                         and "setpoints" in d.field_changes]
     assert setpoint_deltas

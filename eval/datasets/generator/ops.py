@@ -15,6 +15,11 @@ Every operator here is grounded in an edit observed in the real pair
   AddDCN + BumpRevision    -> every real revision does both
   MoveAnnotation           -> position-only change
   Reexport                 -> producer-variation null (handled at render)
+  ChangeValveSymbol        -> valve glyph swap, tag text unchanged (graphical-
+                              only edit; exercises src/delta/raster_diff.py +
+                              raster_join.py, invisible to the text pipeline)
+  RerouteLine              -> geom_line endpoint moved to a different nozzle
+                              (pure geometry, no text element involved at all)
 """
 from __future__ import annotations
 
@@ -331,6 +336,50 @@ def remove_valve(ctx: OpContext, a: Sheet, b: Sheet) -> OpResult:
     return r
 
 
+def change_valve_symbol(ctx: OpContext, a: Sheet, b: Sheet) -> OpResult:
+    """Swaps a valve's drawn glyph (gate <-> globe) WITHOUT touching its
+    tag text -- the case the symbolic (text-only) pipeline is
+    structurally blind to by construction, since CanonicalElement.content
+    never changes. Exists specifically to exercise src/delta/raster_diff.py
+    + raster_join.py. attrs["symbol_type"] is a new attribute, deliberately
+    NOT attrs["body"] (which IS baked into the rendered tag text -- see
+    content.py -- so changing it would defeat the whole point)."""
+    r = OpResult(op_name="ChangeValveSymbol")
+    cands = [e for e in b.elements.values() if e.role == "valve_tag"]
+    if not cands:
+        return r
+    el = ctx.rng.choice(cands)
+    old = el.attrs.get("symbol_type", "gate")
+    new = "globe" if old == "gate" else "gate"
+    el.attrs["symbol_type"] = new
+    r.deltas.append(_mod_delta(ctx, a, b, el.eid, {"symbol_type": [old, new]},
+                                f"valve symbol changed {old} -> {new} on {el.text} (tag unchanged)"))
+    r.applied = True
+    return r
+
+
+def reroute_line(ctx: OpContext, a: Sheet, b: Sheet) -> OpResult:
+    """Moves a geom_line's endpoint to a different nozzle -- a purely
+    graphical/geometric edit with no text-bearing element involved at
+    all, exercising raster_join.py's "geometry" classification (as
+    opposed to change_valve_symbol's "graphical" one)."""
+    r = OpResult(op_name="RerouteLine")
+    lines = [e for e in b.elements.values() if e.role == "geom_line"]
+    nozzles = [e for e in b.elements.values() if e.role == "nozzle"]
+    if not lines or not nozzles:
+        return r
+    el = ctx.rng.choice(lines)
+    noz = ctx.rng.choice(nozzles)
+    old_dx, old_dy = el.attrs["dx"], el.attrs["dy"]
+    new_dx, new_dy = noz.anchor[0] - el.anchor[0], noz.anchor[1] - el.anchor[1]
+    el.attrs["dx"], el.attrs["dy"] = new_dx, new_dy
+    r.deltas.append(_mod_delta(ctx, a, b, el.eid,
+                                {"dx": [old_dx, new_dx], "dy": [old_dy, new_dy]},
+                                f"line rerouted to nozzle {noz.text}"))
+    r.applied = True
+    return r
+
+
 def bump_revision_and_dcn(ctx: OpContext, a: Sheet, b: Sheet) -> OpResult:
     """Always applied last. Real change, never the interesting one."""
     r = OpResult(op_name="BumpRevisionAndDCN")
@@ -365,4 +414,5 @@ CONTENT_OPS = [
     systematic_tag_renumber, change_pipe_class, change_setpoint,
     reword_note_equivalent, change_note_substantive, change_datasheet_value,
     move_annotation, add_instrument, remove_valve,
+    change_valve_symbol, reroute_line,
 ]

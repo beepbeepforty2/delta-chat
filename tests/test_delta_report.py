@@ -50,6 +50,19 @@ def test_render_markdown_shows_severity_summary_and_orders_critical_first():
     assert modify_section.index("[CRITICAL]") < modify_section.index("[LOW]")
 
 
+def test_render_markdown_shows_visual_change_kind_hint_for_unclassified():
+    from src.canonical.model import BBox
+    d = Delta("raster0001", "unclassified_visual_change", "unclassified_visual_change",
+              None, None, 1, "C-4", "C-4", {"tags": ["26GT9143"]}, 0.3,
+              "graphical change near 26GT9143; not characterized by text engine",
+              bbox_a=BBox(0.1, 0.1, 0.2, 0.2), bbox_b=BBox(0.1, 0.1, 0.2, 0.2),
+              visual_change_kind="graphical")
+    md = render_markdown([d], "pid_a", "pid_b")
+    assert "## Unclassified Visual Changes (raster recall net) (1)" in md
+    assert "[graphical]" in md
+    assert "zone C-4" in md
+
+
 def test_write_report_includes_severity_in_json(tmp_path):
     d = Delta("d1", "modify", "instrument", "i1", "i1", 1, "B-2", "B-2",
               {"setpoints": [{"HH": 1}, {"HH": 2}]}, 1.0, "setpoint changed",

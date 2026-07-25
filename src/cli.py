@@ -13,7 +13,8 @@ from src.delta.align import match_elements, match_sheets
 from src.delta.classify import classify_matches
 from src.delta.model import Delta
 from src.delta.precheck import check_same_document
-from src.delta.raster_recall import detect_unclassified_visual_changes
+from src.delta.raster_diff import RasterCfg, load_raster_gray, propose_change_regions
+from src.delta.raster_join import join_regions_to_symbolic
 from src.delta.register import register
 from src.delta.report import write_report
 from src.delta.semantic_null import annotate_semantic_null
@@ -81,21 +82,43 @@ def compute_deltas(doc_a: CanonicalDocument, doc_b: CanonicalDocument, tracer: T
         s.set("n_flagged", sum(1 for d in deltas if d.semantic_null))
         s.set("llm_enabled", os.environ.get("DELTA_SEMANTIC_NULL_LLM") == "1")
 
-    with tracer.span("raster_recall") as s:
-        # Opt-in (DELTA_RASTER_RECALL=1), no-op otherwise -- see
-        # src/delta/raster_recall.py. Confidence-gated: never fires on a
-        # native-native pair (extraction_confidence is always 1.0 there).
-        recall_deltas = detect_unclassified_visual_changes(doc_a, doc_b, deltas, transform)
-        deltas.extend(recall_deltas)
-        if recall_deltas:
+    raster_cfg = RasterCfg.from_env()
+    els_a_all = [el for sh in doc_a.sheets for el in sh.elements]
+    els_b_all = [el for sh in doc_b.sheets for el in sh.elements]
+
+    with tracer.span("raster_diff") as s:
+        # Opt-in (DELTA_RASTER_DIFF=1), no-op otherwise -- see
+        # src/delta/raster_diff.py. Unlike the retired raster_recall.py,
+        # this is NOT confidence/geometry-density gated: a valve-symbol
+        # swap is exactly as likely on a clean native pair as a scanned
+        # one, so a gate built for "OCR missed content entirely" would
+        # silently suppress the case this stage exists to catch.
+        all_regions = []
+        if raster_cfg.enable_raster:
+            for sheet_no in sorted(set(sh.number for sh in doc_a.sheets)
+                                    & set(sh.number for sh in doc_b.sheets)):
+                path_a = doc_a.raster_paths.get(sheet_no)
+                path_b = doc_b.raster_paths.get(sheet_no)
+                if not path_a or not path_b:
+                    continue
+                all_regions.extend(propose_change_regions(
+                    load_raster_gray(path_a), load_raster_gray(path_b),
+                    transform, raster_cfg, sheet=sheet_no))
+        s.set("enabled", raster_cfg.enable_raster)
+        s.set("n_regions", len(all_regions))
+
+    with tracer.span("raster_join") as s:
+        residue = join_regions_to_symbolic(all_regions, els_a_all, els_b_all, deltas, raster_cfg) \
+            if all_regions else []
+        deltas.extend(residue)
+        if residue:
             # These deltas didn't exist during the classify span's
             # annotate_severity() call above -- re-run it (idempotent,
             # pure function of kind/element_type/field_changes) so every
             # delta in the report has a severity, not just the ones that
             # existed before this pass.
             annotate_severity(deltas)
-        s.set("n_detected", len(recall_deltas))
-        s.set("enabled", os.environ.get("DELTA_RASTER_RECALL") == "1")
+        s.set("n_residue", len(residue))
 
     return deltas
 

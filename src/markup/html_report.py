@@ -6,7 +6,7 @@ This is the UI layer for the person who requested the diff, not a
 debugging tool for the person building the engine -- that distinction
 matters for what feeds it: every box, badge, and row here comes from the
 REAL deterministic pipeline (src/delta/'s register -> align -> classify ->
-severity -> semantic_null -> raster_recall), the same `Delta` objects
+severity -> semantic_null -> raster_diff -> raster_join), the same `Delta` objects
 `report.py` renders to markdown. It borrows its two-pane-plus-sidebar
 layout and click-to-navigate interaction from `tools/visual_diff.py`,
 which is a deliberately independent, naive matcher built as a sanity check
@@ -53,18 +53,26 @@ def _bbox_list(el) -> list[float]:
     return [b.x0, b.y0, b.x1, b.y1]
 
 
+def _bbox_obj_list(b) -> list[float]:
+    return [b.x0, b.y0, b.x1, b.y1]
+
+
 def _build_delta_records(deltas: list[Delta], boxes_a: dict, boxes_b: dict) -> list[dict]:
     """One record per Delta (primary AND cascade -- the sidebar filters,
     it doesn't pre-drop). `unclassified_visual_change` deltas have no
-    id_a/id_b by construction (raster_recall.py finds pixels, not
-    elements), so both box_a/box_b stay None for them -- the sidebar shows
-    these with a "no exact location" note instead of silently omitting
-    them, since the whole point of that pass is surfacing what extraction
-    missed, not hiding it a second time here."""
+    id_a/id_b by construction (raster_join.py finds pixels, not
+    elements), so they never resolve through the element-lookup path
+    (boxes_a/boxes_b) -- but raster_join.py DOES set bbox_a/bbox_b
+    directly on the Delta itself (the region it found), so that's used
+    as a fallback location. Only a Delta with genuinely neither (older
+    callers, or a future producer that doesn't set them) falls through
+    to the sidebar's "no exact location" note."""
     box_a_by_did = {d.did: _bbox_list(el) for entries in boxes_a.values() for el, d in entries}
     box_b_by_did = {d.did: _bbox_list(el) for entries in boxes_b.values() for el, d in entries}
     records = []
     for d in deltas:
+        box_a = box_a_by_did.get(d.did) or (_bbox_obj_list(d.bbox_a) if d.bbox_a is not None else None)
+        box_b = box_b_by_did.get(d.did) or (_bbox_obj_list(d.bbox_b) if d.bbox_b is not None else None)
         records.append({
             "did": d.did,
             "kind": d.kind,
@@ -78,8 +86,9 @@ def _build_delta_records(deltas: list[Delta], boxes_a: dict, boxes_b: dict) -> l
             "primary_did": d.primary_did,
             "semantic_null": d.semantic_null,
             "semantic_null_reason": d.semantic_null_reason,
-            "box_a": box_a_by_did.get(d.did),
-            "box_b": box_b_by_did.get(d.did),
+            "visual_change_kind": d.visual_change_kind,
+            "box_a": box_a,
+            "box_b": box_b,
         })
     return records
 

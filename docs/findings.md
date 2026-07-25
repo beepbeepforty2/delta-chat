@@ -482,55 +482,106 @@ previously invisible finding, now on record.
 
 ## Raster recall net
 
-A confidence-gated fallback for content extraction misses *entirely* —
-deliberately not the same problem as the scanned-format precision
-collapse (false positives from garbage OCR *text*, i.e. wrong classified
-deltas). This targets the opposite failure: real visual content with no
-extracted element at all, so the deterministic match/classify pipeline
-has nothing to work with in the first place.
+**This section describes a full rewrite.** An earlier, simpler version
+(`src/delta/raster_recall.py`: raw pixel-diff, PIL affine warp, fixed
+0.2 confidence, confidence/density-gated trigger) shipped first and is
+now retired entirely, replaced by `src/delta/raster_diff.py` (region
+*proposal*) + `src/delta/raster_join.py` (*adjudication*), built around
+one explicit design principle: **raster localizes, symbolic classifies**
+— the raw diff mask is never emitted as deltas directly; only the
+residue the symbolic pipeline couldn't explain becomes a
+`unclassified_visual_change` delta.
 
-**Trigger:** per sheet, mean extraction confidence below a threshold, or
-geometry-element count above a density threshold (the "dense geometry"
-case — real vendor P&IDs run ~5000 geometry paths/sheet vs. this
-project's synthetic dataset's ~80-120). Both thresholds are structurally
-incapable of firing on a native-native pair — a built-in safety property,
-not a special case that has to be remembered.
+**Why the trigger gate was dropped, not carried over.** The retired
+module only ran when mean extraction confidence was low or geometry
+density was high — a fair heuristic for "OCR missed content entirely,"
+but wrong for this rewrite's actual purpose: a valve symbol swapping
+type at an unchanged tag, or a rerouted line, is exactly as likely on a
+perfectly clean **native** pair (extraction confidence always 1.0) as on
+a scanned one. Keeping that gate would have silently suppressed the
+stage on the exact cases — `ChangeValveSymbol`, `RerouteLine`, both new
+generator operators built specifically to exercise this path — it exists
+to catch. The new master switch (`DELTA_RASTER_DIFF`) is unconditional.
 
-**Mechanics:** warps revision B's raster into revision A's frame using
-the registration transform (a real similarity transform via PIL's affine
-transform), takes absolute grayscale pixel difference, thresholds, finds
-connected regions, drops any region overlapping an already-classified
-delta's bbox, and emits the rest as a low-confidence
-"unclassified visual change" with a generic templated description. No
-LLM call anywhere in this path; opt-in via an env flag, default off.
+**Mechanics (`raster_diff.py`):** warps B's raster into A's frame via
+`cv2.warpAffine`, using a 2x3 matrix derived from `register.py`'s own
+`Transform` (validated the same way the registration transform itself
+was — a point-algebra check against `Transform.apply()`'s own
+predictions, plus an image-level marker test, not trusted from the
+algebra alone); diffs via SSIM (`skimage.metrics.structural_similarity`,
+`1 - ssim_map` as the difference magnitude) rather than raw `|A-B|`,
+specifically because a raw pixel diff lights up the 1px anti-alias
+fringe on every unchanged glyph and line, while SSIM compares local
+structure and tolerates sub-pixel misalignment; morphological open then
+dilate cleans up the thresholded mask; connected components, filtered by
+min/max area, become `ChangeRegion`s.
 
-The affine-transform matrix used for the warp is the *inverse* of the
-registration transform — a derivation, not a guess, validated the same
-way the registration transform itself was: a known non-trivial
-transform, a marker at a known position, warped, and its actual output
-position checked against the transform's own prediction, not trusted on
-inspection of the algebra alone.
+**A real bug the very first synthetic test caught, before any real PDF
+was touched:** `cv2.normalize`'s global min-max contrast stretch,
+applied independently per image, turns a near-blank page into all-zero
+pixels (nothing to stretch a constant image *to*), while the same call
+on the other, content-bearing image correctly spans the full range —
+comparing them then reports a spurious whole-page "difference" instead
+of the one real injected change. Fixed by dropping the global stretch
+entirely (SSIM's own luminance/contrast terms already normalize locally,
+per-window, which is the right place for this); Otsu binarization (an
+optional, well-defined per-image threshold) was kept.
 
-A second real bug caught before it shipped, not after: the new
-`unclassified_visual_change` kind never matches any ground-truth kind by
-construction, so leaving it in the normal prediction pool would count
-every single raster-recall hit as an automatic false positive against a
-P/R/F1 bar it was never meant to be judged by. Excluded from that pool
-the same way a semantic-null-flagged delta is, reported as a plain count
-instead.
+**A real bug the align.py bucketing already had, only exposed once real
+content raised geometry density:** every geometry shape — line, circle,
+rect — shares the one coarse `CanonicalElement.type` value `"geometry"`;
+the actual shape lives only in `attrs["geom_kind"]`. `align.py`'s
+type-bucketing (deliberately hard-partitions cross-type matches as
+"never semantically correct," e.g. a `line_tag` can never become a
+`valve_tag`) never extended that same guarantee to geometry sub-kinds,
+because with ~7 geometry elements per synthetic sheet it never mattered.
+Once valve-symbol glyphs (2-3 real vector shapes per valve, dozens per
+sheet) pushed density up, the Hungarian matcher genuinely started
+pairing a line against a circle on a **producer-variation null pair** —
+content similarity is always 1.0 for empty-content geometry, so shape
+carried zero cost signal without a fix. `align.py` now sub-buckets
+geometry by `geom_kind` too (`_bucket_key`), restoring the same
+"cross-shape was never correct" guarantee every other type already had.
 
-The report's kind-ordering list needed the new kind added too, or these
-deltas would render into the raw JSON but silently vanish from the
-human-readable markdown report — caught before shipping by actually
-reading the rendered report, not assumed correct from the code.
+**The interaction this design explicitly accepts, not hides:** because
+"explained" is a bare bbox/centroid overlap check with no kind
+requirement, a valve's own drawn glyph (2-3 raw vector shapes,
+independently visible to `pdf_native.py`'s geometry extraction, exactly
+like a real vendor drawing's valve icon — see
+`data/samples/real_pair_valves/PROVENANCE.md`, which measured the same
+thing on real content) can produce a coincidental symbolic geometry
+delta (e.g. a "circle removed" when a globe valve becomes a gate valve)
+that suppresses the raster net's own contribution at that exact spot.
+Confirmed on the generator's own `ChangeValveSymbol` GT case: the
+symbolic pipeline correctly cannot match the change by *kind* (it sees
+`remove`, not `modify` — the GT's own kind), but that same `remove`
+delta's bbox still counts as "explained," so the raster net doesn't get
+a chance to flag it as `unclassified_visual_change` either. On this
+dataset's one seed, this drove the measured recall lift on
+`ChangeValveSymbol`/`RerouteLine` GT rows to **0.0** — a real, honestly
+disappointing number on this specific case, not a hidden one.
 
-Live-verified against a real degraded pair: triggers correctly, found 15
-candidate regions after dedup against already-classified deltas on that
-sheet. Honestly, there's no ground truth for "genuinely missed visual
-content" in this dataset to check precision against, so it isn't
-possible to claim these 15 are all real misses rather than partly
-compression/noise artifacts from that level's own degradation — a real,
-open limitation of this feature as built, stated plainly.
+**The most important honest number, from the null-pair calibration
+check itself:** a true self-identical pair (`null_ident_900`, and
+separately the real `26-KA-901` vendor PDF compared against itself)
+produces **0** raster regions — clean. But `null_prod_901` (the
+generator's actual producer-variation null pair — same content, rendered
+with a different font/producer, no jitter-free re-export) produced
+**71** `unclassified_visual_change` deltas in a live `make eval` run.
+Root cause, confirmed directly: `null_prod`'s ground truth is (correctly)
+empty — identical content means zero symbolic deltas — so there is
+*nothing* for `raster_join.py`'s explained-check to suppress against,
+and every real pixel-level difference a full font substitution produces
+(Helvetica → Courier, across the whole page) survives straight through
+as residue. This does **not** violate the null-pair false-positive
+contract (`score_pair` excludes `unclassified_visual_change` from that
+count by construction, same as the retired module — `hard_false_positives`
+stays 0), but it is a real, honest limitation worth stating plainly:
+**this stage is not robust to producer/font-rendering variation the way
+the symbolic layer is**, because it has no semantic notion of "same
+content, different glyph" — only pixels. The symbolic layer solves this
+exact case correctly (fuzzy content matching ignores font entirely);
+the raster layer, by design, cannot.
 
 ## Architecture review: confirmed-clean items
 
