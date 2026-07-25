@@ -11,17 +11,30 @@ construction (the generator keeps drawno constant across a revision, only
 tf_rev changes). Falls back to equipment_tag content when no drawno was
 extracted, which is what fires on the real samples (no separate
 drawing-number stamp was locatable there, see data/samples/PROVENANCE.md).
-If neither is extractable on either document, proceeds with a warning
-rather than refusing -- failing open on a diff is safer than silently
-blocking one just because title-block extraction under-performed.
+
+If neither title-block signal is extractable on either document, falls
+back to a third tier: Jaccard overlap of specific tag identifiers
+(line/valve/nozzle/equipment/instrument tag content) across the two
+documents. Real revision pairs share the vast majority of their tags
+unchanged; sibling/unrelated documents share almost none, even on the same
+vendor template -- a cheap, generically-available signal needing no new
+extraction. Only when there's no comparable tag content on one side
+either (truly zero signal of any kind) does it finally proceed with a
+warning rather than refuse -- failing open on a diff is safer than
+silently blocking one just because extraction under-performed everywhere.
 """
 from __future__ import annotations
 
+import os
 from collections import Counter
 from dataclasses import dataclass
 from typing import Optional
 
 from src.canonical.model import CanonicalDocument
+
+TAG_OVERLAP_MIN = float(os.environ.get("PRECHECK_TAG_OVERLAP_MIN", "0.3"))
+
+_TAG_TYPES = {"line_tag", "valve_tag", "nozzle", "equipment_tag", "instrument"}
 
 
 @dataclass
@@ -53,6 +66,19 @@ def _find_equipment_tag(doc: CanonicalDocument) -> Optional[str]:
     return Counter(tags).most_common(1)[0][0]
 
 
+def _tag_content_overlap(doc_a: CanonicalDocument, doc_b: CanonicalDocument) -> Optional[float]:
+    """Jaccard overlap of specific tag-identifier content between the two
+    documents. None means one side has no comparable tag content at all --
+    truly no signal, not just "low overlap"."""
+    tags_a = {el.content for sheet in doc_a.sheets for el in sheet.elements
+              if el.type in _TAG_TYPES and el.content}
+    tags_b = {el.content for sheet in doc_b.sheets for el in sheet.elements
+              if el.type in _TAG_TYPES and el.content}
+    if not tags_a or not tags_b:
+        return None
+    return len(tags_a & tags_b) / len(tags_a | tags_b)
+
+
 def check_same_document(doc_a: CanonicalDocument, doc_b: CanonicalDocument) -> PrecheckResult:
     drawno_a, drawno_b = _find_drawno(doc_a), _find_drawno(doc_b)
     equip_a, equip_b = _find_equipment_tag(doc_a), _find_equipment_tag(doc_b)
@@ -69,6 +95,16 @@ def check_same_document(doc_a: CanonicalDocument, doc_b: CanonicalDocument) -> P
         return PrecheckResult(False, f"equipment tags differ: {equip_a!r} vs {equip_b!r}",
                                drawno_a, drawno_b, equip_a, equip_b)
 
-    return PrecheckResult(True, "no drawing number or equipment tag extracted on one or both "
-                                 "documents; proceeding without identity confirmation",
+    overlap = _tag_content_overlap(doc_a, doc_b)
+    if overlap is not None:
+        if overlap >= TAG_OVERLAP_MIN:
+            return PrecheckResult(True, f"no title-block identity signal extracted; "
+                                         f"tag-content overlap {overlap:.0%} indicates same document",
+                                   drawno_a, drawno_b, equip_a, equip_b)
+        return PrecheckResult(False, f"no title-block identity signal extracted; "
+                                      f"tag-content overlap only {overlap:.0%}, likely different documents",
+                               drawno_a, drawno_b, equip_a, equip_b)
+
+    return PrecheckResult(True, "no drawing number, equipment tag, or comparable tag content "
+                                 "extracted on either document; proceeding without identity confirmation",
                            drawno_a, drawno_b, equip_a, equip_b)

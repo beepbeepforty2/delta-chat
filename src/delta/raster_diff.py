@@ -63,6 +63,8 @@ class RasterCfg:
     conf_base: float = 0.15
     conf_scale: float = 0.35
     conf_cap: float = 0.45
+    enable_text_confirm: bool = True
+    text_confirm_overlap_frac: float = 0.6
 
     @classmethod
     def from_env(cls) -> RasterCfg:
@@ -85,6 +87,8 @@ class RasterCfg:
             conf_base=float(os.environ.get("RASTER_JOIN_CONF_BASE", "0.15")),
             conf_scale=float(os.environ.get("RASTER_JOIN_CONF_SCALE", "0.35")),
             conf_cap=float(os.environ.get("RASTER_JOIN_CONF_CAP", "0.45")),
+            enable_text_confirm=_env_bool("RASTER_JOIN_ENABLE_TEXT_CONFIRM", True),
+            text_confirm_overlap_frac=float(os.environ.get("RASTER_JOIN_TEXT_CONFIRM_OVERLAP_FRAC", "0.6")),
         )
 
 

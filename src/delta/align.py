@@ -30,6 +30,12 @@ from src.delta.register import Transform
 W_TEXT = float(os.environ.get("DELTA_W_TEXT", "0.6"))
 W_SPATIAL = float(os.environ.get("DELTA_W_SPATIAL", "0.4"))
 MAX_MATCH_COST = float(os.environ.get("DELTA_MAX_MATCH_COST", "0.55"))
+# How far above MAX_MATCH_COST a rejected near-miss cost must be before
+# classify.py::_confidence() treats it as fully unambiguous (guard=1.0)
+# again, rather than dividing by MAX_MATCH_COST itself -- which would only
+# saturate at ~2x the threshold (~1.1), well past where a genuinely
+# unrelated same-type candidate on a normal-density sheet actually lands.
+NEAR_MISS_SATURATION_MARGIN = float(os.environ.get("DELTA_NEAR_MISS_SATURATION_MARGIN", "0.4"))
 
 # Type-bucketing assumes an element's type is stable across a revision --
 # true for almost everything, but DeleteNoteKeepPlaceholder (see
@@ -77,6 +83,14 @@ class MatchedPair:
     b: Optional[CanonicalElement]
     cost: Optional[float] = None     # None for pure add/remove (no candidate considered)
     margin: Optional[float] = None   # best-cost vs next-best-alternative gap; None if no alternative existed
+    near_miss_cost: Optional[float] = None  # for a single-sided pair only: the best
+    # available cross-cost against the opposite pool, even though it wasn't picked
+    # (either the Hungarian assignment preferred someone else, or it was picked and
+    # then rejected for exceeding MAX_MATCH_COST). None means the opposite pool was
+    # empty -- no candidate existed at all, so this really is an unambiguous add/
+    # remove. classify.py uses this to tell "no counterpart anywhere" (stay
+    # confident) apart from "a plausible match got rejected" (report low
+    # confidence -- likely a matching failure, not a real change).
 
 
 def match_sheets(doc_a: CanonicalDocument, doc_b: CanonicalDocument):
@@ -146,10 +160,10 @@ def _match_bucket(pool_a: list[CanonicalElement], pool_b: list[CanonicalElement]
 
     for i, a in enumerate(pool_a):
         if i not in matched_a:
-            out.append(MatchedPair(a, None))
+            out.append(MatchedPair(a, None, near_miss_cost=float(cost[i, :].min())))
     for j, b in enumerate(pool_b):
         if j not in matched_b:
-            out.append(MatchedPair(None, b))
+            out.append(MatchedPair(None, b, near_miss_cost=float(cost[:, j].min())))
     return out
 
 

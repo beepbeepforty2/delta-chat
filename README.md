@@ -157,31 +157,76 @@ Measured, honestly, not claimed:
 | Check | Result |
 |---|---|
 | Registration/tolerance calibration: true self-identical pair (`null_ident_900`, and the real 26-KA-901 vendor PDF vs. itself) | **0** regions |
-| The generator's actual producer-variation null pair (`null_prod_901` — same content, different font/producer) | **71** residue deltas — see below |
+| The generator's actual producer-variation null pair (`null_prod_901` — same content, different font/producer) | **61** residue deltas, down from 71 — see below |
 | Recall lift on this dataset's `ChangeValveSymbol`/`RerouteLine` GT rows, raster on vs. off | **0.0** (recall stayed 0.0 both ways on this seed) |
 
-The `null_prod_901` number is a real, honest limitation, not a bug being
-hidden: that pair's ground truth is correctly empty (identical content),
-so there is nothing for the symbolic-explained check to suppress
-against, and a full font substitution (Helvetica → Courier) produces
-real pixel-level differences across the whole page that the raster net
-has no semantic basis to distinguish from an actual change — unlike the
-symbolic layer, which gets this exact case right via content-based fuzzy
-matching (font-invariant by construction). This does not violate the
-null-pair false-positive contract (`unclassified_visual_change` is
-excluded from that count the same way a semantic-null flag is), but it
-is a genuine, stated gap: **this stage is not robust to
-producer/rendering variation the way the symbolic layer is.** The 0.0
-recall lift is a second honest finding: on this dataset's one seed, a
-valve's own drawn glyph is also independently visible to the symbolic
-geometry pipeline (a circle appearing/disappearing when a globe valve
-becomes a gate valve), and that coincidental symbolic delta suppresses
-the raster net's own contribution at the same spot. Full detail on both,
-including the two real bugs this rewrite caught along the way (a
-contrast-normalization bug that fabricated a whole-page false diff on a
-blank page, and a cross-shape matching bug in `align.py` exposed only
-once real content raised geometry density), is in
-[`docs/findings.md`](docs/findings.md).
+`raster_join.py` includes an ensemble check for exactly the
+`null_prod_901` case: if the symbolic layer independently confirms the
+text under a region is **unchanged** (identical extracted content on
+both sides, directly under the region — not just nearby, which would
+also eat the `ChangeValveSymbol` case this stage exists to catch), the
+region is suppressed the same way a symbolic *change* already suppresses
+one. This is a real, tested fix (it catches, and was built specifically
+around, a confirmed near-miss: the same identical-content note covering
+a region at 0.5 on one side and 0.9 on the other, because a monospace
+font renders the same string at a different width than a proportional
+one — requiring each side to independently clear a fixed threshold
+rejected this for no good reason; checking the *pair's average* coverage
+doesn't) — but it only closed **10 of 71** regions on this dataset.
+Investigated directly, not assumed: the dominant remainder is a
+different, harder problem than the one this check solves. A full-page
+font substitution doesn't produce one diff region per changed glyph —
+`raster_diff.py`'s own morphological dilation (by design, to merge a
+cluster of changed strokes into one region instead of fifty specks)
+merges dozens of individual per-glyph font differences into a handful of
+**giant, multi-element regions**, one of which covered 62% of the entire
+page in a live check. No single matched text element can ever "explain"
+a region that large — the fix above only ever asks "does one element's
+own bbox account for this region," which is the right question for a
+region the size of one note or tag, and the wrong one for a region the
+size of half the drawing. Closing that gap for real needs a different
+check (does the *union* of many matched, content-identical elements
+collectively tile the region — not "one element covers it") — a
+genuinely bigger, separate piece of work, left as a stated, honest limit
+rather than forced through here.
+
+The 0.0 recall lift is a separate honest finding, unaffected by the
+above: on this dataset's one seed, a valve's own drawn glyph is also
+independently visible to the symbolic geometry pipeline (a circle
+appearing/disappearing when a globe valve becomes a gate valve), and
+that coincidental symbolic delta suppresses the raster net's own
+contribution at the same spot — confirmed with no regression after the
+ensemble fix above (it only ever adds suppression, never removes it,
+verified directly). Full detail on all of this, including the two real
+bugs this rewrite caught along the way (a contrast-normalization bug
+that fabricated a whole-page false diff on a blank page, and a
+cross-shape matching bug in `align.py` exposed only once real content
+raised geometry density), is in [`docs/findings.md`](docs/findings.md).
+
+### External review: 3 fixes
+
+A second-opinion review flagged 4 issues; each was checked against the
+actual code, not taken at face value. Full detail in `docs/findings.md`.
+
+- **Add/remove confidence gap (real bug, fixed).** A rejected near-miss
+  candidate and a truly unambiguous add/remove were indistinguishable in
+  the reported confidence (both `1.0` on native PDFs). Verified
+  concretely: every false-positive `remove` delta in the L0 eval dataset
+  now reports confidence `0.0` instead of `1.0` after the fix (propagate
+  the rejected candidate's cost as `near_miss_cost`, scale confidence down
+  by how close it sits to `MAX_MATCH_COST`).
+- **`precheck.py`'s fail-open fallback (real design gap, fixed).** Added a
+  third tier — tag-content Jaccard overlap — before conceding blind when
+  neither drawing number nor equipment tag is extractable on either
+  document.
+- **Instrument-bubble format gap (already tracked, fixed).** Real vendor
+  bubbles stack func/loop/system text across separate baselines; a
+  position-gated second pass (`_stack_instrument_bubbles`, keyed off real
+  circle geometry) now recovers them. The real-sample `xfail` is gone —
+  it passes for real now.
+- **Retrieval's lexical-only BM25 (already mitigated, not re-fixed)** —
+  `config/domain.yaml`'s alias table already softens this; a full fix
+  means embeddings (the declared-but-unimplemented L3 layer).
 
 Chat, all 43 questions across the dataset's `qa.jsonl`:
 

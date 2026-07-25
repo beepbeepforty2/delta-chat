@@ -64,18 +64,15 @@ def test_tag_types_have_real_hits(sample):
         assert by_type.get(etype, 0) > 0, f"no {etype} elements found"
 
 
-@pytest.mark.xfail(
-    reason="real instrument bubbles stack system/function/loop across three "
-           "separate baselines (e.g. '26' / 'PI' / '9055' on distinct lines, "
-           "confirmed by inspection), unlike the synthetic generator's "
-           "single-line 'FUNC LOOP SYS' format parse_instrument expects. "
-           "Same-baseline clustering correctly keeps them separate since "
-           "they are genuinely distinct text runs -- this is a real "
-           "composition-format gap, not a clustering bug. Fixing it needs "
-           "2D proximity-based grouping, out of scope for this pass.",
-    strict=True,
-)
-def test_instrument_bubbles_not_yet_detected_on_real_samples(sample):
+def test_instrument_bubbles_detected_on_real_samples(sample):
+    """Real instrument bubbles stack system/function/loop across three
+    separate baselines (e.g. '26' / 'PI' / '9055' on distinct lines),
+    unlike the synthetic generator's single-line 'FUNC LOOP SYS' format
+    parse_instrument expects. Same-baseline clustering correctly keeps them
+    separate since they are genuinely distinct text runs -- this was a
+    real composition-format gap, not a clustering bug -- fixed by
+    _stack_instrument_bubbles' position-gated second pass (see
+    pdf_native.py)."""
     path, _ = sample
     doc = PdfNativeAdapter().ingest("real_sample", path)
     n_instrument = sum(1 for e in doc.sheets[0].elements if e.type == "instrument")

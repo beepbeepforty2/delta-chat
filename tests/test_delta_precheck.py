@@ -2,6 +2,7 @@ import pathlib
 
 import pytest
 
+from src.canonical.model import BBox, CanonicalDocument, CanonicalElement, CanonicalSheet
 from src.delta.precheck import check_same_document
 from src.ingest.pdf_native import PdfNativeAdapter
 
@@ -49,3 +50,48 @@ def test_real_document_against_itself_passes_precheck():
     doc = _ingest(LIFT_PDF)
     result = check_same_document(doc, doc)
     assert result.is_pair is True
+
+
+def _tag_el(id_, content, type_="line_tag"):
+    return CanonicalElement(id=id_, type=type_, content=content, bbox=BBox(0.1, 0.1, 0.2, 0.11),
+                             sheet=1, zone="A-1", extraction_confidence=1.0)
+
+
+def _doc(pid, tags):
+    els = [_tag_el(f"e{i}", t) for i, t in enumerate(tags)]
+    return CanonicalDocument(pid=pid, source_format="pdf_native", revision_label=None,
+                              sheets=[CanonicalSheet(number=1, width=1.0, height=1.0, elements=els)])
+
+
+def test_no_titleblock_signal_but_high_tag_overlap_passes():
+    """Neither drawno nor equipment_tag extracted on either side, but the
+    two documents share the vast majority of their tag identifiers --
+    the new tier-3 fallback should treat this as the same document rather
+    than proceeding blind."""
+    doc_a = _doc("a", ["26-L-1001", "26-L-1002", "26-L-1003", "26-L-1004"])
+    doc_b = _doc("b", ["26-L-1001", "26-L-1002", "26-L-1003", "26-L-1099"])
+    result = check_same_document(doc_a, doc_b)
+    assert result.is_pair is True
+    assert "tag-content overlap" in result.reason
+
+
+def test_no_titleblock_signal_and_low_tag_overlap_is_refused():
+    """Neither drawno nor equipment_tag extracted on either side, and the
+    tag identifiers barely overlap at all -- likely different documents,
+    should now be refused instead of blindly proceeding."""
+    doc_a = _doc("a", ["26-L-1001", "26-L-1002", "26-L-1003", "26-L-1004"])
+    doc_b = _doc("b", ["44-L-2001", "44-L-2002", "44-L-2003", "44-L-2004"])
+    result = check_same_document(doc_a, doc_b)
+    assert result.is_pair is False
+    assert "tag-content overlap" in result.reason
+
+
+def test_no_comparable_content_at_all_still_fails_open():
+    """The genuinely-blind case (no title-block signal AND no tag content
+    on one side either) must still proceed with a warning -- the one
+    remaining safety-net gap this fix deliberately leaves in place."""
+    doc_a = _doc("a", ["26-L-1001", "26-L-1002"])
+    doc_b = _doc("b", [])
+    result = check_same_document(doc_a, doc_b)
+    assert result.is_pair is True
+    assert "proceeding without identity confirmation" in result.reason

@@ -80,6 +80,72 @@ def _text_elements_overlapping(region: ChangeRegion, elements: list[CanonicalEle
             and _bboxes_intersect(el.bbox, padded)]
 
 
+def _overlap_fraction(region_bbox: BBox, el_bbox: BBox) -> float:
+    """What fraction of region_bbox's own area is covered by el_bbox --
+    not IoU (which also penalizes el_bbox being much larger than the
+    region): this measures "is the diff region fully accounted for by
+    this element," the right question for suppression."""
+    ix0, iy0 = max(region_bbox.x0, el_bbox.x0), max(region_bbox.y0, el_bbox.y0)
+    ix1, iy1 = min(region_bbox.x1, el_bbox.x1), min(region_bbox.y1, el_bbox.y1)
+    if ix1 <= ix0 or iy1 <= iy0:
+        return 0.0
+    inter = (ix1 - ix0) * (iy1 - iy0)
+    region_area = (region_bbox.x1 - region_bbox.x0) * (region_bbox.y1 - region_bbox.y0)
+    return inter / region_area if region_area else 0.0
+
+
+def _candidate_text_elements(region: ChangeRegion, elements: list[CanonicalElement]) -> list[CanonicalElement]:
+    """Text-bearing elements on the region's sheet with ANY positive
+    overlap against the region's own (unpadded) bbox -- a loose
+    pre-filter; _is_text_confirmed_unchanged applies the real threshold
+    to the PAIR's combined overlap, not to each side independently (see
+    its docstring for why)."""
+    return [el for el in elements
+            if el.sheet == region.sheet and el.type != "geometry" and el.content.strip()
+            and _overlap_fraction(region.bbox, el.bbox) > 0]
+
+
+def _is_text_confirmed_unchanged(region: ChangeRegion, elements_a: list[CanonicalElement],
+                                  elements_b: list[CanonicalElement], cfg: RasterCfg) -> bool:
+    """True when the region is directly, substantially covered by an
+    element whose extracted content is IDENTICAL on both sides -- strong
+    evidence the underlying pixel diff is a rendering artifact (font,
+    anti-aliasing, producer variation), not a real change. This is the
+    ensemble half of "raster localizes, symbolic classifies": the
+    symbolic layer's own confirmation that nothing changed here is used
+    to suppress a raster hit, exactly the way a symbolic CHANGE already
+    suppresses one in _is_explained -- just the mirror case. Position
+    already does the disambiguation work a global content-equality check
+    would need: a matching pair must independently overlap THIS region on
+    both sides, so an unrelated same-text element elsewhere on the sheet
+    can never trigger this.
+
+    Threshold is applied to the PAIR's *average* overlap fraction, not to
+    each side independently: a live check against the generator's
+    producer-variation null pair (Helvetica vs. Courier -- a monospace
+    font renders the same string at a different width than a proportional
+    one) found real near-misses where the identical-content element
+    covered the region at 0.56 on one side and 0.62 on the other --
+    requiring each side to independently clear the same fixed bar
+    rejected these for no good reason; the two sides disagreeing on
+    exactly how much of the region their own (differently-metriced) font
+    covers is itself part of what a font substitution looks like, not
+    evidence the match is wrong."""
+    if not cfg.enable_text_confirm:
+        return False
+    cand_a = _candidate_text_elements(region, elements_a)
+    cand_b = _candidate_text_elements(region, elements_b)
+    for el_a in cand_a:
+        for el_b in cand_b:
+            if el_a.content != el_b.content:
+                continue
+            frac_a = _overlap_fraction(region.bbox, el_a.bbox)
+            frac_b = _overlap_fraction(region.bbox, el_b.bbox)
+            if (frac_a + frac_b) / 2 >= cfg.text_confirm_overlap_frac:
+                return True
+    return False
+
+
 def _confidence(region: ChangeRegion, cfg: RasterCfg) -> float:
     """Low, scaled by diff magnitude and region size, hard-capped below
     any symbolic delta's typical confidence range. area_px isn't
@@ -135,6 +201,8 @@ def join_regions_to_symbolic(regions: list[ChangeRegion],
     counter = 0
     for region in regions:
         if _is_explained(region, deltas_by_sheet.get(region.sheet, []), els_a_by_id, els_b_by_id, cfg):
+            continue
+        if _is_text_confirmed_unchanged(region, elements_a, elements_b, cfg):
             continue
 
         overlap_a = _text_elements_overlapping(region, elements_a, cfg)

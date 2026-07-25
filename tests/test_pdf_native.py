@@ -11,7 +11,8 @@ import pytest
 
 from generator.content import make_sheet
 from generator.render import render_pdf, degrade
-from src.ingest.pdf_native import PdfNativeAdapter
+from src.canonical.model import BBox, CanonicalElement
+from src.ingest.pdf_native import PdfNativeAdapter, _stack_instrument_bubbles
 
 
 @pytest.fixture(scope="module")
@@ -148,3 +149,84 @@ def test_raster_paths_populated(doc_std):
 
 def test_revision_label_extracted(doc_std):
     assert doc_std.revision_label == "A"
+
+
+def _orphan(id_, content, x0, y0, x1, y1):
+    return CanonicalElement(id=id_, type="unknown", content=content, bbox=BBox(x0, y0, x1, y1),
+                             sheet=1, zone="A-1", extraction_confidence=1.0,
+                             attrs={"classification_rule": "fallback:tag_like"})
+
+
+def _circle(id_, x0, y0, x1, y1):
+    return CanonicalElement(id=id_, type="geometry", content="", bbox=BBox(x0, y0, x1, y1),
+                             sheet=1, zone="A-1", extraction_confidence=1.0,
+                             attrs={"geom_kind": "circle"})
+
+
+def test_stacked_bubble_tokens_merge_into_instrument():
+    """Real vendor instrument bubbles stack func/loop inside the circle
+    and the system/unit label just outside it -- mirrors the exact layout
+    found by inspecting data/samples/Lift Gas compressor-P&ID.pdf."""
+    circle = _circle("c1", 0.500, 0.500, 0.514, 0.520)
+    func = _orphan("t1", "PI", 0.505, 0.505, 0.508, 0.512)
+    loop = _orphan("t2", "9055", 0.503, 0.512, 0.512, 0.519)
+    system = _orphan("t3", "26", 0.492, 0.503, 0.497, 0.510)
+    unrelated = _orphan("t4", "unrelated text", 0.700, 0.700, 0.750, 0.710)
+
+    result = _stack_instrument_bubbles([func, loop, system, unrelated], [circle], sheet_no=1)
+
+    instruments = [e for e in result if e.type == "instrument"]
+    assert len(instruments) == 1
+    assert instruments[0].attrs == {"func": "PI", "loop": 9055, "system": "26"}
+    ids = {e.id for e in result}
+    assert "t1" not in ids and "t2" not in ids and "t3" not in ids  # absorbed
+    assert "t4" in ids  # untouched
+
+
+def test_stray_tokens_far_from_any_circle_not_merged():
+    """Same 3 token shapes, but nowhere near a circle -- must not merge
+    (regression guard: this pass is gated on real bubble geometry, not a
+    free-floating vertical-stacking heuristic)."""
+    far_circle = _circle("c1", 0.100, 0.100, 0.110, 0.115)
+    func = _orphan("t1", "PI", 0.505, 0.505, 0.508, 0.512)
+    loop = _orphan("t2", "9055", 0.503, 0.512, 0.512, 0.519)
+    system = _orphan("t3", "26", 0.492, 0.503, 0.497, 0.510)
+
+    result = _stack_instrument_bubbles([func, loop, system], [far_circle], sheet_no=1)
+
+    assert not any(e.type == "instrument" for e in result)
+    assert {e.id for e in result} == {"t1", "t2", "t3"}
+
+
+def test_already_classified_element_never_consumed():
+    """A short token that already classified as something meaningful
+    (not tier-3 fallback) must never be swept into a bubble merge, even
+    if positioned exactly right -- only genuinely-unclustered orphans are
+    fair game."""
+    circle = _circle("c1", 0.500, 0.500, 0.514, 0.520)
+    func = _orphan("t1", "PI", 0.505, 0.505, 0.508, 0.512)
+    loop = _orphan("t2", "9055", 0.503, 0.512, 0.512, 0.519)
+    already_classified = CanonicalElement(
+        id="t3", type="zone_label", content="26", bbox=BBox(0.492, 0.503, 0.497, 0.510),
+        sheet=1, zone="A-1", extraction_confidence=1.0,
+        attrs={"classification_rule": "regex:zone_label"},
+    )
+
+    result = _stack_instrument_bubbles([func, loop, already_classified], [circle], sheet_no=1)
+
+    assert not any(e.type == "instrument" for e in result)
+    ids = {e.id for e in result}
+    assert {"t1", "t2", "t3"} == ids  # nothing absorbed, all left as-is
+
+
+def test_single_line_synthetic_format_unaffected_by_bubble_stacking(doc_std, sheet):
+    """The existing single-line generator format ('PIT 9055 26' already on
+    one baseline) must keep working exactly as before -- it's classified
+    directly by parse_instrument via the normal per-line path and never
+    even reaches _stack_instrument_bubbles as an orphan."""
+    gt_inst = next(e for e in sheet.elements.values()
+                   if e.role == "instrument" and "setpoints" in e.attrs)
+    match = next(e for e in doc_std.sheets[0].elements
+                 if e.type == "instrument" and e.attrs.get("loop") == gt_inst.attrs["loop"])
+    assert match.attrs["func"] == gt_inst.attrs["func"]
+    assert match.attrs["system"] == gt_inst.attrs["system"]

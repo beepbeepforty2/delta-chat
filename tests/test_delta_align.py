@@ -95,6 +95,44 @@ def test_geometry_never_matches_across_geom_kind():
     assert (None, "c1") in kinds
 
 
+def test_rejected_near_miss_gets_near_miss_cost():
+    """A candidate existed in the same bucket but its cost exceeded
+    MAX_MATCH_COST, so both elements become single-sided pairs -- but
+    unlike a genuine no-candidate-at-all add/remove, the rejected cost
+    itself must survive onto near_miss_cost so classify.py can tell the
+    two cases apart (see MatchedPair's docstring)."""
+    el_a = CanonicalElement(id="a1", type="note", content="AAAA", bbox=BBox(0.1, 0.1, 0.2, 0.11),
+                             sheet=1, zone="A-1", extraction_confidence=1.0)
+    el_b = CanonicalElement(id="b1", type="note", content="ZZZZ", bbox=BBox(0.9, 0.9, 1.0, 0.91),
+                             sheet=1, zone="F-9", extraction_confidence=1.0)
+    sheet_a = CanonicalSheet(number=1, width=1.0, height=1.0, elements=[el_a])
+    sheet_b = CanonicalSheet(number=1, width=1.0, height=1.0, elements=[el_b])
+
+    result = match_elements(sheet_a, sheet_b, Transform())
+
+    assert len(result) == 2
+    pair_a = next(m for m in result if m.a is el_a)
+    pair_b = next(m for m in result if m.b is el_b)
+    assert pair_a.b is None and pair_b.a is None
+    assert pair_a.near_miss_cost is not None and pair_a.near_miss_cost > 0.55
+    assert pair_b.near_miss_cost is not None and pair_b.near_miss_cost > 0.55
+
+
+def test_unmatched_element_with_empty_opposite_pool_has_no_near_miss_cost():
+    """No candidate of the same type exists on the other side at all --
+    a genuinely unambiguous add/remove, not a rejected near-miss."""
+    el_a = CanonicalElement(id="a1", type="note", content="AAAA", bbox=BBox(0.1, 0.1, 0.2, 0.11),
+                            sheet=1, zone="A-1", extraction_confidence=1.0)
+    sheet_a = CanonicalSheet(number=1, width=1.0, height=1.0, elements=[el_a])
+    sheet_b = CanonicalSheet(number=1, width=1.0, height=1.0, elements=[])
+
+    result = match_elements(sheet_a, sheet_b, Transform())
+
+    assert len(result) == 1
+    assert result[0].a is el_a and result[0].b is None
+    assert result[0].near_miss_cost is None
+
+
 def test_null_ident_pair_matches_everything():
     pair_dir = PAIRS_DIR / "null_ident_900"
     if not pair_dir.exists():

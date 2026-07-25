@@ -31,7 +31,7 @@ from collections import defaultdict
 from typing import Optional
 
 from src.canonical.model import CanonicalElement
-from src.delta.align import MatchedPair, match_group
+from src.delta.align import MAX_MATCH_COST, NEAR_MISS_SATURATION_MARGIN, MatchedPair, match_group
 from src.delta.model import Delta
 from src.delta.severity import annotate_severity
 
@@ -88,13 +88,28 @@ def _confidence(pair: MatchedPair) -> float:
     a real (<1.0) OCR confidence is involved, and product is strictly more
     conservative there (0.8*0.8=0.64 vs min=0.8), matching the intent that
     two independently-uncertain extractions should compound, not just take
-    the worse of the two."""
+    the worse of the two.
+
+    For a single-sided add/remove, extraction_confidence alone used to be
+    the whole story -- always 1.0 on native PDFs regardless of whether the
+    element truly has no counterpart or a plausible match was simply
+    rejected for exceeding MAX_MATCH_COST. See the near_miss_cost guard
+    below for why that's no longer true."""
     if pair.a and pair.b:
         ext_conf = pair.a.extraction_confidence * pair.b.extraction_confidence
         margin_term = 1.0 if pair.margin is None else max(0.0, min(1.0, pair.margin))
         return round(margin_term * ext_conf, 4)
     el = pair.a or pair.b
-    return round(el.extraction_confidence, 4)
+    if pair.near_miss_cost is None:
+        return round(el.extraction_confidence, 4)
+    # A plausible candidate existed on the other side but was rejected for
+    # exceeding MAX_MATCH_COST -- this add/remove may really be a matching
+    # failure, not a genuine change, so scale confidence down by how close the
+    # rejected cost was to the threshold: just-over-threshold (near miss) ->
+    # near-zero guard; far above threshold (clearly unrelated) -> guard = 1.0,
+    # unchanged from today's behavior.
+    guard = min(1.0, max(0.0, (pair.near_miss_cost - MAX_MATCH_COST) / NEAR_MISS_SATURATION_MARGIN))
+    return round(el.extraction_confidence * guard, 4)
 
 
 def _describe(kind: str, a: Optional[CanonicalElement], b: Optional[CanonicalElement], fc: dict) -> str:

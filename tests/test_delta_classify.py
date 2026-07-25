@@ -9,7 +9,7 @@ generator's own round-trip validator (eval/datasets/generator/generate.py
 import pytest
 
 from src.canonical.model import BBox, CanonicalElement
-from src.delta.align import MatchedPair, match_elements
+from src.delta.align import MAX_MATCH_COST, MatchedPair, match_elements
 from src.delta.classify import _confidence, classify_matches, _detect_family_offset_cascades
 from src.delta.model import Delta
 from src.delta.register import Transform
@@ -35,6 +35,31 @@ def test_confidence_is_product_not_min_of_both_sides():
 
 def test_confidence_native_native_unaffected_by_the_fix():
     pair = MatchedPair(a=_el(1.0), b=_el(1.0), margin=1.0)
+    assert _confidence(pair) == 1.0
+
+
+def test_true_add_remove_with_no_candidate_keeps_full_confidence():
+    """near_miss_cost=None (no candidate existed at all on the other side)
+    must behave exactly as before this fix: confidence = extraction_confidence."""
+    pair = MatchedPair(a=_el(1.0), b=None, near_miss_cost=None)
+    assert _confidence(pair) == 1.0
+
+
+def test_near_miss_add_remove_gets_low_confidence():
+    """A rejected candidate just over MAX_MATCH_COST -- this add/remove may
+    really be a matching failure, not a genuine change -- must report much
+    lower confidence than the equivalent true add/remove (same
+    extraction_confidence, near_miss_cost=None)."""
+    just_over = MatchedPair(a=_el(1.0), b=None, near_miss_cost=MAX_MATCH_COST + 0.01)
+    assert _confidence(just_over) < 0.1
+    assert _confidence(just_over) < _confidence(MatchedPair(a=_el(1.0), b=None, near_miss_cost=None))
+
+
+def test_near_miss_cost_far_above_threshold_keeps_full_confidence():
+    """A rejected candidate that's clearly unrelated (cost near the
+    theoretical max of ~1.0) is just as good a signal as no candidate at
+    all -- the guard must saturate back to 1.0, not stay depressed."""
+    pair = MatchedPair(a=_el(1.0), b=None, near_miss_cost=0.95)
     assert _confidence(pair) == 1.0
 
 

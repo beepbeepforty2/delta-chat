@@ -23,6 +23,7 @@ import fitz  # PyMuPDF
 
 from src.canonical.model import BBox, CanonicalDocument, CanonicalElement, CanonicalSheet
 from src.canonical.classify import classify, classify_geometry
+from src.canonical.tags import parse_instrument
 from src.canonical.zones import compute_zone
 from src.ingest.base import FormatAdapter, element_id
 
@@ -31,8 +32,22 @@ GAP_MULTIPLIER = float(os.environ.get("PDF_NATIVE_GAP_MULTIPLIER", "3.0"))
 Y_TOL_RATIO = float(os.environ.get("PDF_NATIVE_Y_TOL_RATIO", "0.5"))
 RASTER_DPI = int(os.environ.get("PDF_NATIVE_RASTER_DPI", "150"))
 RASTER_CACHE_DIR = os.environ.get("PDF_NATIVE_RASTER_CACHE_DIR", "raster_cache")
+# Real vendor instrument bubbles stack system/function/loop across 3
+# separate baselines inside one circle glyph (see _stack_instrument_bubbles
+# docstring); padding around the circle's own bbox, as a fraction of the
+# circle's own size, when looking for those stacked tokens. 0.6, not a
+# small margin: inspecting the real Lift/Export samples directly found the
+# "system" (area/unit) label conventionally sits OUTSIDE the bubble to one
+# side, at ~0.5x the circle's own width away -- unlike func/loop, which sit
+# inside. Tuned empirically against both real samples: the detected count
+# plateaus at 0.6-1.0 and only grows marginally even at 2x that, confirming
+# this isn't bridging to unrelated nearby bubbles.
+INSTRUMENT_BUBBLE_PADDING_RATIO = float(os.environ.get("PDF_NATIVE_INSTRUMENT_BUBBLE_PADDING_RATIO", "0.6"))
 
 _WS_RE = re.compile(r"\s+")
+_INSTRUMENT_FUNC_RE = re.compile(r'^[A-Z]{2,4}$')
+_INSTRUMENT_SYSTEM_RE = re.compile(r'^\d{2}$')
+_INSTRUMENT_LOOP_RE = re.compile(r'^-?\d{3,5}$')
 
 
 def _extract_spans(page: "fitz.Page") -> list[dict]:
@@ -174,6 +189,91 @@ def _geometry_elements(page: "fitz.Page", sheet_no: int) -> list[CanonicalElemen
     return out
 
 
+def _is_orphan_token(el: CanonicalElement) -> bool:
+    """A tier-3 catch-all classification (see classify.py) -- a short,
+    unstructured token that didn't match any known tag/field shape on its
+    own. The only kind of element _stack_instrument_bubbles is allowed to
+    consume; anything already meaningfully classified is left untouched."""
+    return el.type == "unknown" and el.attrs.get("classification_rule", "").startswith("fallback:")
+
+
+def _stack_instrument_bubbles(text_elements: list[CanonicalElement],
+                               circle_elements: list[CanonicalElement],
+                               sheet_no: int) -> list[CanonicalElement]:
+    """Second pass over already-clustered text: real vendor instrument
+    bubbles stack system/function/loop text across up to 3 separate
+    baselines inside one circle glyph (e.g. "26" / "PI" / "9055" on
+    distinct lines), unlike the synthetic generator's single-line
+    "FUNC LOOP SYSTEM" format INSTRUMENT_RE expects. Same-baseline
+    clustering correctly keeps these apart as distinct text runs -- this
+    is a real composition-format gap, not a clustering bug -- so recovery
+    needs a position-gated second pass, not a looser same-baseline
+    tolerance.
+
+    Gated on real circle geometry (not a free-floating vertical-stacking
+    heuristic): only orphan tokens (see _is_orphan_token) whose center
+    falls inside -- or just outside, within INSTRUMENT_BUBBLE_PADDING_RATIO
+    -- an actual circle glyph's own bbox are ever considered, so this can
+    never accidentally merge unrelated stray tokens elsewhere on a dense
+    real sheet. A circle "adopts" at most one token per shape (one
+    func-shaped, one system-shaped, one loop-shaped); reassembles them in
+    parse_instrument's expected order (real vendor stacking order differs
+    from that order); and only replaces the 3 orphans with one instrument
+    element if the reassembled string actually parses."""
+    if not circle_elements:
+        return text_elements
+
+    orphans = {el.id: el for el in text_elements if _is_orphan_token(el)}
+    if not orphans:
+        return text_elements
+
+    consumed_ids: set = set()
+    new_elements: list[CanonicalElement] = []
+
+    for circle in circle_elements:
+        cx0, cy0, cx1, cy1 = circle.bbox.x0, circle.bbox.y0, circle.bbox.x1, circle.bbox.y1
+        pad_x = (cx1 - cx0) * INSTRUMENT_BUBBLE_PADDING_RATIO
+        pad_y = (cy1 - cy0) * INSTRUMENT_BUBBLE_PADDING_RATIO
+        px0, py0, px1, py1 = cx0 - pad_x, cy0 - pad_y, cx1 + pad_x, cy1 + pad_y
+
+        candidates = []
+        for el in orphans.values():
+            if el.id in consumed_ids:
+                continue
+            ex = (el.bbox.x0 + el.bbox.x1) / 2
+            ey = (el.bbox.y0 + el.bbox.y1) / 2
+            if px0 <= ex <= px1 and py0 <= ey <= py1:
+                candidates.append(el)
+
+        func_el = next((el for el in candidates if _INSTRUMENT_FUNC_RE.match(el.content.strip())), None)
+        system_el = next((el for el in candidates if _INSTRUMENT_SYSTEM_RE.match(el.content.strip())), None)
+        loop_el = next((el for el in candidates if _INSTRUMENT_LOOP_RE.match(el.content.strip())), None)
+        if not (func_el and system_el and loop_el):
+            continue
+        if len({func_el.id, system_el.id, loop_el.id}) != 3:
+            continue  # one token can't satisfy two roles at once
+
+        composite = f"{func_el.content.strip()} {loop_el.content.strip()} {system_el.content.strip()}"
+        parsed = parse_instrument(composite)
+        if not parsed:
+            continue
+
+        parts = [func_el, system_el, loop_el]
+        bbox = BBox(min(p.bbox.x0 for p in parts), min(p.bbox.y0 for p in parts),
+                    max(p.bbox.x1 for p in parts), max(p.bbox.y1 for p in parts))
+        eid = element_id(sheet_no, "instrument", composite, bbox)
+        new_elements.append(CanonicalElement(
+            id=eid, type="instrument", content=composite, bbox=bbox, sheet=sheet_no,
+            zone=func_el.zone, extraction_confidence=1.0, attrs=parsed,
+        ))
+        consumed_ids.update(p.id for p in parts)
+
+    if not new_elements:
+        return text_elements
+    kept = [el for el in text_elements if el.id not in consumed_ids]
+    return kept + new_elements
+
+
 def _revision_label(elements: list[CanonicalElement]) -> Optional[str]:
     for el in elements:
         if el.type == "title_field" and el.attrs.get("field") == "rev":
@@ -215,7 +315,11 @@ class PdfNativeAdapter(FormatAdapter):
         all_elements_by_sheet: dict[int, list[CanonicalElement]] = {}
         for i, page in enumerate(doc):
             sheet_no = i + 1
-            elements = _text_elements(page, sheet_no) + _geometry_elements(page, sheet_no)
+            text_els = _text_elements(page, sheet_no)
+            geom_els = _geometry_elements(page, sheet_no)
+            circles = [el for el in geom_els if el.attrs.get("geom_kind") == "circle"]
+            text_els = _stack_instrument_bubbles(text_els, circles, sheet_no)
+            elements = text_els + geom_els
             all_elements_by_sheet[sheet_no] = elements
             sheets.append(CanonicalSheet(
                 number=sheet_no, width=page.rect.width, height=page.rect.height,

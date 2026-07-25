@@ -583,6 +583,67 @@ content, different glyph" — only pixels. The symbolic layer solves this
 exact case correctly (fuzzy content matching ignores font entirely);
 the raster layer, by design, cannot.
 
+### An ensemble fix, and why it only partly closes the gap above
+
+The obvious next question, asked directly: the symbolic layer *does*
+know, independently, that the text at a given spot is unchanged (same
+extracted content both sides) — shouldn't that be usable to suppress a
+raster hit there, the same way a symbolic *change* already suppresses
+one? Yes, and `raster_join.py` now does exactly this
+(`_is_text_confirmed_unchanged`) — but it cannot be "matching text nearby
+→ suppress" as a blanket rule, because `ChangeValveSymbol` (the generator
+operator built specifically to exercise this stage) produces the
+identical signal: a tag's text is unchanged *by design* while the valve's
+drawn symbol next to it really changed. From "is there matching text
+nearby?" alone, a font-substitution false positive and a genuine
+valve-symbol change look the same. The real discriminator is *where* the
+diff sits relative to the matched text, not *whether* it exists nearby:
+a font change sits directly on the glyphs themselves; a valve-symbol
+change sits in the padding margin around the tag (`render.py`'s
+`_draw_valve_symbol_pdf`/`_draw_valve_symbol_dxf` draw the glyph ~8mm
+offset from the tag's own anchor, deliberately non-overlapping). So the
+fix suppresses only when a region is *directly, substantially* covered
+(`cfg.text_confirm_overlap_frac`, default 0.6) by an element with
+identical content on both sides — not merely nearby.
+
+A live check immediately surfaced a second, narrower bug in the fix's
+first version: it required *each side independently* to clear the
+overlap threshold, but a monospace font renders the same string at a
+different width than a proportional one, so the identical element
+legitimately covered the region at, e.g., 0.56 on one side and 0.62 on
+the other — an artifact of the font substitution itself, not evidence
+the match was wrong. Requiring both sides to independently clear the
+same fixed bar rejected exactly the case the fix exists for. Changed to
+threshold the *pair's average* overlap instead (`(frac_a + frac_b) / 2
+>= cfg.text_confirm_overlap_frac`) — a small, targeted correction, with
+a dedicated regression test (`test_asymmetric_font_width_still_suppresses_via_pair_average`)
+reproducing the exact near-miss shape.
+
+**The honest result: 71 → 61, not 71 → 0.** Investigated directly rather
+than assumed: the ensemble fix closes 10 of the 71 regions — real, and
+verified with no regression on `ChangeValveSymbol`/`RerouteLine` recall
+(that metric only ever adds suppression, never removes it; confirmed
+directly it stayed at 0.0, not worse). The dominant remainder is a
+qualitatively different problem this fix was never designed to solve. A
+full-page font substitution doesn't produce one diff region per changed
+glyph — `raster_diff.py`'s own morphological dilation (by design, to
+merge a cluster of changed strokes into one region instead of fifty
+specks) merges dozens of individual per-glyph font differences into a
+handful of **giant, multi-element regions** — one, inspected directly,
+spanned roughly 62% of the entire page, covering the whole numbered-notes
+column and every zone label in one connected blob. No single matched
+text element can ever satisfy a "does one element's own bbox account for
+this region" check at that scale; the fix above only ever asks that
+question, which is the right one for a region the size of a single note
+or tag, and structurally the wrong one for a region the size of half the
+drawing. Correctly closing this remainder would need a different check
+entirely — does the *union* of many matched, content-identical elements
+collectively tile the region, not "does one element cover it" — a
+genuinely bigger, separate design (identifying every element overlapping
+a large region, confirming each is itself unchanged, and accumulating
+coverage across all of them until the region is accounted for or isn't).
+Left as a stated, honest limit rather than forced through in this pass.
+
 ## Architecture review: confirmed-clean items
 
 Two claims checked and found already correct, not fixed because nothing
@@ -597,3 +658,69 @@ was wrong:
   function is 100% f-string templating; a repo-wide search for LLM/API
   client references in the delta engine turns up zero hits outside
   docstrings describing intentionally-deferred future enrichment.
+
+## A second external review: 2 real bugs fixed, 1 already tracked, 1 already mitigated
+
+A review from a different LLM flagged 4 issues. Each was checked against
+the actual code before any fix, not taken at face value.
+
+**Real, novel bug: add/remove confidence gap.** `align.py`'s Hungarian
+matcher rejects a candidate pair whenever its cost exceeds
+`MAX_MATCH_COST` — but the rejected cost itself was being discarded, so
+both elements became single-sided `MatchedPair`s reported with confidence
+= `extraction_confidence` alone, which is hardcoded to `1.0` for every
+native-PDF element. A genuinely ambiguous near-miss (a plausible match
+that got rejected) and a truly unambiguous add/remove (no candidate
+existed at all) were indistinguishable in the reported confidence.
+Verified concretely, not just in theory: before this fix, every
+false-positive `remove` delta in the L0 eval dataset — including all 5
+`remove` deltas the engine produces on `not_a_pair_903` (the
+deliberately-mismatched refusal-control pair) — would have reported
+confidence `1.0`. Fixed by propagating the rejected candidate's cost onto
+the pair as `near_miss_cost` and scaling confidence down the closer that
+cost sits to `MAX_MATCH_COST` (see `align.py`'s `_match_bucket` and
+`classify.py`'s `_confidence`). Live re-run after the fix: every one of
+those same false-positive removes now reports confidence `0.0` instead of
+`1.0`.
+
+**Real, deliberate design gap: `precheck.py`'s fail-open fallback.** When
+neither drawing number nor equipment tag is extractable on either
+document, the pre-fix code proceeded with a bare warning and zero
+secondary heuristic. Note this path wasn't exercised by the existing
+real-sample sibling test (`test_real_sibling_drawings_are_refused`) at
+all — the real 26-KA-901/902 samples both have extractable
+`equipment_tag`, so the existing tier 2 already catches them; the gap
+only bites in the narrower, previously-untested case. Added a third tier:
+Jaccard overlap of specific tag identifiers (line/valve/nozzle/equipment/
+instrument tag content) between the two documents — real revision pairs
+share the vast majority of their tags unchanged; unrelated documents share
+almost none, even on the same vendor template. Only when there's truly no
+comparable tag content on one side either does it still fail open.
+
+**Already tracked: `pdf_native.py`'s instrument-bubble format gap.** Real
+vendor instrument bubbles stack system/function/loop text across three
+separate baselines (e.g. `"26"` / `"PI"` / `"9055"` on distinct lines),
+unlike the synthetic generator's single-line format. This was already
+known and tracked via `@pytest.mark.xfail` — the reviewer independently
+spotted a real, already-documented gap, not new information. Fixed with a
+second pass (`_stack_instrument_bubbles`) gated on real circle geometry
+(never a free-floating vertical-stacking heuristic, to avoid false merges
+on a dense real sheet): finds circles that "own" exactly one func-shaped,
+one system-shaped, and one loop-shaped orphan token, reassembles them in
+`parse_instrument`'s expected order, and replaces the three orphans with
+one `instrument` element. The padding radius around a circle's own bbox
+needed real tuning, not a guess — inspecting the real samples directly
+found the system/unit label conventionally sits *outside* the bubble to
+one side, at roughly half the circle's own width away, while func/loop
+sit inside it. Tuned empirically against both real samples: detected
+count plateaus at a padding ratio of 0.6-1.0 and grows only marginally
+even at 2x that, confirming the fix isn't bridging to unrelated nearby
+bubbles. The `xfail` marker has been removed — the real-sample test now
+passes for real, not as an aspiration.
+
+**Already mitigated, not re-fixed: `retrieval.py`'s lexical-only BM25.**
+`config/domain.yaml`'s alias-expansion table already exists specifically
+to soften this; a full fix would mean embeddings-based retrieval (the
+declared-but-unimplemented L3 layer noted elsewhere in this document).
+The reviewer's broader point stands as a real, already-acknowledged
+limitation, not something this pass re-addressed.

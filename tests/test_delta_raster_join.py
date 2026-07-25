@@ -111,6 +111,82 @@ def test_tag_proximity_padding_is_load_bearing():
     assert without_padding[0].visual_change_kind == "geometry"
 
 
+def test_region_directly_overlapping_unchanged_text_is_suppressed():
+    """The ensemble fix: a region substantially covering a text element
+    with IDENTICAL content on both sides (simulating a font/producer
+    change -- the null_prod false-positive case) is suppressed entirely,
+    not just labeled. Same tag position/content as
+    test_tag_proximity_padding_is_load_bearing, but the region sits ON
+    the tag's own bbox this time, not just near it."""
+    el_a = _el("v1", "26GT9143", 0.50, 0.50, 0.60, 0.52, type_="valve_tag")
+    el_b = _el("v1", "26GT9143", 0.50, 0.50, 0.60, 0.52, type_="valve_tag")
+    region = _region(0.50, 0.50, 0.58, 0.52)  # entirely inside el's bbox
+
+    residue = join_regions_to_symbolic([region], [el_a], [el_b], [], RasterCfg())
+    assert residue == []
+
+
+def test_region_only_near_unchanged_text_is_not_suppressed():
+    """Regression guard for the exact case this fix must not break:
+    ChangeValveSymbol relies on a region sitting in the PADDING margin
+    around an unchanged tag (the glyph is drawn ~8mm offset from its
+    tag, per render.py), never directly on the tag's own bbox. Same
+    fixture as test_tag_proximity_padding_is_load_bearing -- confirms
+    the new suppression path does not fire on it."""
+    el_a = _el("v1", "26GT9143", 0.50, 0.50, 0.60, 0.52, type_="valve_tag")
+    el_b = _el("v1", "26GT9143", 0.50, 0.50, 0.60, 0.52, type_="valve_tag")
+    region = _region(0.478, 0.495, 0.498, 0.515)  # padding-only, zero direct overlap
+
+    residue = join_regions_to_symbolic([region], [el_a], [el_b], [], RasterCfg())
+    assert len(residue) == 1
+    assert residue[0].visual_change_kind == "graphical"
+
+
+def test_text_confirm_overlap_frac_is_load_bearing():
+    """The threshold has a real, testable effect -- matches the existing
+    ablation-testing convention for every other RasterCfg field."""
+    el_a = _el("v1", "26GT9143", 0.50, 0.50, 0.60, 0.52, type_="valve_tag")
+    el_b = _el("v1", "26GT9143", 0.50, 0.50, 0.60, 0.52, type_="valve_tag")
+    # region's y-range matches el's exactly; x-range only half overlaps
+    # (0.55-0.60 out of the region's own 0.55-0.65) -> overlap_fraction == 0.5
+    region = _region(0.55, 0.50, 0.65, 0.52)
+
+    lenient = join_regions_to_symbolic([region], [el_a], [el_b], [],
+                                        RasterCfg(text_confirm_overlap_frac=0.4))
+    strict = join_regions_to_symbolic([region], [el_a], [el_b], [],
+                                       RasterCfg(text_confirm_overlap_frac=0.95))
+
+    assert lenient == []  # 0.4 threshold: suppressed
+    assert len(strict) == 1  # 0.95 threshold: not enough overlap, kept
+
+
+def test_asymmetric_font_width_still_suppresses_via_pair_average():
+    """The exact scenario a live null_prod run surfaced: the same
+    identical-content element covers the region at very different
+    fractions on each side (a monospace font renders the same string at
+    a different width than a proportional one). Requiring EACH side to
+    independently clear the threshold rejects this for no good reason --
+    el_a alone covers only 0.5 of the region (below the 0.6 default),
+    which would have failed a both-sides-independent check -- but the
+    pair's average (0.5 + 0.9) / 2 = 0.7 correctly clears it."""
+    region = _region(0.50, 0.50, 0.60, 0.52)  # width 0.10
+    el_a = _el("n1", "SAME NOTE TEXT", 0.50, 0.50, 0.55, 0.52)   # covers 0.05/0.10 = 0.5
+    el_b = _el("n1", "SAME NOTE TEXT", 0.50, 0.50, 0.59, 0.52)   # covers 0.09/0.10 = 0.9
+
+    residue = join_regions_to_symbolic([region], [el_a], [el_b], [], RasterCfg())
+    assert residue == []
+
+
+def test_enable_text_confirm_toggle_disables_the_check():
+    el_a = _el("v1", "26GT9143", 0.50, 0.50, 0.60, 0.52, type_="valve_tag")
+    el_b = _el("v1", "26GT9143", 0.50, 0.50, 0.60, 0.52, type_="valve_tag")
+    region = _region(0.50, 0.50, 0.58, 0.52)  # same as the suppression-case test
+
+    residue = join_regions_to_symbolic([region], [el_a], [el_b], [],
+                                        RasterCfg(enable_text_confirm=False))
+    assert len(residue) == 1
+
+
 def test_multi_sheet_deltas_only_explain_their_own_sheet():
     el_a = _el("a1", "old", 0.4, 0.4, 0.6, 0.5, sheet=1)
     el_b = _el("b1", "new", 0.4, 0.4, 0.6, 0.5, sheet=1)
