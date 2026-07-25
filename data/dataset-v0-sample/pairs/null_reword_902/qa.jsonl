@@ -1,4 +1,0 @@
-{"q": "What changed on sheet 1?", "expected_behavior": "answer", "a": "0 primary change(s): ", "citations": []}
-{"q": "Did any alarm or trip setpoints change?", "expected_behavior": "answer", "a": "No setpoint changes between these revisions.", "citations": []}
-{"q": "What changed on sheet 7?", "expected_behavior": "refuse", "a": "There is no sheet 7; the document has 1 sheet.", "citations": []}
-{"q": "What is the HH setpoint of TIT-9010 in the revised document?", "expected_behavior": "answer", "a": "160", "citations": ["inst00"]}

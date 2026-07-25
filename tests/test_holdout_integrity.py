@@ -23,7 +23,7 @@ MANIFEST = HOLDOUT / "manifest.jsonl"
 
 pytestmark = pytest.mark.skipif(
     not MANIFEST.exists(),
-    reason="held-out set not present (see createrealdatapdf/real-pair-sources.md)",
+    reason="held-out set not present (see tools/holdout/real-pair-sources.md)",
 )
 
 # Mirrors eval/run_eval.py::_RASTER_ONLY_OPS. Duplicated on purpose: if that

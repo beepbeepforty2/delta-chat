@@ -1,7 +1,7 @@
 """Delta report emission: JSON (machine-readable) + Markdown (human-readable).
 
 `description` fields are the deterministic placeholders from classify.py;
-CLAUDE.md decision #3 reserves human-readable description authoring as one
+DESIGN.md decision #3 reserves human-readable description authoring as one
 of the LLM's roles, layered on top of this report later, not required for
 the deltas themselves to be correct or reportable now.
 """

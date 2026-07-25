@@ -1,6 +1,6 @@
 """Pre-check: are these two documents actually revisions of one document?
 
-CLAUDE.md decision #6: compare title-block drawing number / equipment tag
+DESIGN.md decision #6: compare title-block drawing number / equipment tag
 before diffing; refuse to diff siblings. The eval dataset's `not_a_pair`
 control and our own real 26-KA-901 vs 26-KA-902 samples (genuinely
 different equipment, same vendor template) are exactly this failure mode.

@@ -1,6 +1,6 @@
 """Cost/latency/determinism comparison across configured LLM backends.
 
-CLAUDE.md decision #10's "swappable provider" claim is proven by ONE
+DESIGN.md decision #10's "swappable provider" claim is proven by ONE
 alternate provider today (GLM via z.ai's Anthropic-compatible API) -- this
 script is what would prove it with 2+ genuinely different backends side by
 side (tokens, cost, latency, output variance on the same fixed prompts).

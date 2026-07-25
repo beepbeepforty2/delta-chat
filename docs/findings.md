@@ -352,7 +352,7 @@ self-contained HTML file — same two-pane-plus-sidebar shape as
 only; the data underneath is the real engine's own `Delta` objects, not
 that tool's independent naive matcher. Reusing a debug tool's *UI shape*
 while refusing to reuse its *matching logic* is the same principle
-CLAUDE.md decision #2 applies to comparison generally: a good layout
+DESIGN.md decision #2 applies to comparison generally: a good layout
 isn't the thing that was supposed to stay independent, the matcher was.
 
 Two implementation choices worth recording:

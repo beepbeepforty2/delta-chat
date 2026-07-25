@@ -7,7 +7,7 @@ is_cascade/primary_did) so engine output is directly comparable against
 
 `semantic_null`/`semantic_null_reason` are set by src/delta/semantic_null.py,
 an isolated, opt-in pass (DELTA_SEMANTIC_NULL_LLM=1) run after
-classify_matches -- per CLAUDE.md decision #3, semantic-equivalence
+classify_matches -- per DESIGN.md decision #3, semantic-equivalence
 adjudication ("representation changed, meaning did not") is an LLM-
 adjudicated, isolated, non-deterministic zone, so it stays a separate pass
 rather than something classify_matches() itself does; the deterministic

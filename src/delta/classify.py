@@ -1,6 +1,6 @@
 """Classification: matched pairs -> typed Delta records.
 
-CLAUDE.md decision #3: classify add/remove/modify/move; confidence =
+DESIGN.md decision #3: classify add/remove/modify/move; confidence =
 match-cost margin x extraction_confidence. Decision #4: composite tags are
 already parsed into fields by src/canonical/classify.py, so diffing
 CanonicalElement.attrs directly gives field-level deltas for free -- no
@@ -79,7 +79,7 @@ def _field_changes(a: CanonicalElement, b: CanonicalElement) -> dict:
 
 
 def _confidence(pair: MatchedPair) -> float:
-    """CLAUDE.md decision #3: confidence = match-cost margin x
+    """DESIGN.md decision #3: confidence = match-cost margin x
     extraction_conf_a x extraction_conf_b -- a product of both sides'
     confidence, not min(). min() and product agree whenever both sides are
     1.0 (every native-native pair, since pdf_native.py hardcodes

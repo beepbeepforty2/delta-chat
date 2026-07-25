@@ -300,7 +300,7 @@ def eval_chat(dataset_dir: Path, manifest: list[dict]) -> dict:
         "groundedness": score_groundedness_aggregate(all_items),
         "correctness": score_correctness_aggregate(all_items),
         "judge_validation": judge_validation,
-        # CLAUDE.md eval requirement's own methodological caveat, surfaced
+        # DESIGN.md eval requirement's own methodological caveat, surfaced
         # in the scorecard itself (not just docs, which go stale) --
         # True until a JUDGE_LLM_*/JUDGE_MODEL credential is configured.
         "judge_is_same_backend_as_chat": judge_is_same_backend(),

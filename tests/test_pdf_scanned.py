@@ -96,7 +96,7 @@ def test_revision_label_extracted(doc_l1):
 
 def test_recall_does_not_collapse_from_l1_to_l3(doc_l1, doc_l3):
     """L3 adds skew + noise + blur on top of L1. Recall should degrade
-    gracefully, not catastrophically -- this is the actual claim CLAUDE.md
+    gracefully, not catastrophically -- this is the actual claim DESIGN.md
     makes about format-level eval (P/R/F1 per format level), checked here
     as a coarse sanity bound rather than the full eval harness."""
     n_l1 = len(doc_l1.sheets[0].elements)

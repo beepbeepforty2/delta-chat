@@ -2,7 +2,7 @@
 over Delta.kind/element_type/field_changes -- deliberately NOT an LLM
 judgment call. Severity here is about *what kind of field changed on what
 kind of element*, which is exactly the kind of structured, rule-derivable
-fact CLAUDE.md decision #3 keeps in the deterministic engine rather than
+fact DESIGN.md decision #3 keeps in the deterministic engine rather than
 handing to the LLM (whose only roles are description prose, chat answers,
 and semantic-equivalence adjudication).
 

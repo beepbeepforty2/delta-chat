@@ -1,13 +1,18 @@
-# CLAUDE.md — project context for Claude Code
+# DESIGN.md — design decisions of record
+
+The numbered decisions below are cited directly from source docstrings
+("DESIGN.md decision #3") as the rationale for choices that would otherwise
+look arbitrary. Read it alongside [`docs/findings.md`](docs/findings.md),
+which records what happened when these decisions met real data.
 
 ## What this is
 
-Take-home: given two PIDs (document revisions — native PDF / scanned PDF /
-DWG), ingest to a canonical representation, compute a structured delta,
-emit a delta report, and serve grounded chat with citations. Observability
-and a runnable eval harness are required. Depth over breadth.
+Given two PIDs (document revisions — native PDF / scanned PDF / DWG), ingest
+to a canonical representation, compute a structured delta, emit a delta
+report, and serve grounded chat with citations. Observability and a runnable
+eval harness are first-class requirements, not extras. Depth over breadth.
 
-## Established design decisions — do not silently revisit
+## Design decisions
 
 1. **Canonical IR is layered and addressable** (`src/canonical/model.py`):
    L0 retained raster, L1 typed elements (diff space + citation unit,
@@ -20,12 +25,19 @@ and a runnable eval harness are required. Depth over breadth.
 3. **Delta detection is deterministic.** Pipeline: page-level registration
    (similarity transform from high-confidence anchors) → sheet matching →
    per-sheet bipartite element matching (scipy Hungarian; cost =
-   w_text·(1−sim) + w_spatial·dist + w_type·mismatch, weights in .env) →
-   classify add/remove/modify/move. Confidence = match-cost margin
-   (best vs second-best) × extraction_confidence_a × extraction_confidence_b
-   (both sides' extraction confidence, multiplied — not the min of the
-   two; they agree only when both sides are 1.0, i.e. every native-native
-   pair, which is why a min()-based version passed unnoticed for a while).
+   w_text·(1−sim) + w_spatial·dist, weights in .env) → classify
+   add/remove/modify/move. Type is handled by *bucketing* candidates before
+   the Hungarian runs rather than by a type-mismatch cost term: cross-type
+   matches are never semantically correct here (a line_tag never "becomes" a
+   valve_tag), so a hard partition is a faithful simplification and keeps
+   each matrix small at real density (`src/delta/align.py`).
+   Confidence = match-cost margin (best vs second-best) ×
+   extraction_confidence_a × extraction_confidence_b (both sides multiplied,
+   not the min of the two; they agree only when both sides are 1.0, i.e.
+   every native-native pair, which is why a min()-based version passed
+   unnoticed for a while). A single-sided add/remove additionally carries a
+   `near_miss_cost` guard, so a rejected-but-plausible match reports low
+   confidence instead of a misleading 1.0.
    The LLM's only roles:
    (a) writing human-readable change descriptions, (b) chat answers,
    (c) optional semantic-equivalence adjudication — each isolated,
@@ -47,34 +59,16 @@ and a runnable eval harness are required. Depth over breadth.
 8. **Observability is homegrown** (`src/observability/`): context-manager
    spans, correlation id per request, per-span timings, LLM spans capture
    prompt/response/model/tokens/cost, JSONL structured logs, one JSON
-   trace file per request in `traces/`. Justify vs OTel in README
-   (zero infra, fully understood). Failures recorded as failed spans,
-   never swallowed.
-9. **Formats**: native PDF + scanned PDF end-to-end; DWG stays a REAL stub
-   (`src/ingest/dwg.py` documents ODA/LibreDWG→DXF→ezdxf path). Do not
-   implement DWG parsing without being asked.
+   trace file per request in `traces/`. Chosen over OTel for zero infra and
+   full transparency (justified in the README). Failures recorded as failed
+   spans, never swallowed.
+9. **Formats**: native PDF + scanned PDF end-to-end; DWG is a deliberate
+   stub behind a real seam (`src/ingest/dwg.py` documents the
+   ODA/LibreDWG→DXF→ezdxf path), cut in favour of depth on the OCR path.
 10. **LLM behind one interface** (`src/chat/llm.py`), provider/model from
     env, keys never committed, prompt caching for the two-document context.
 
-## Steps
-
-1. [x] Dataset generator with layered GT (first commit)
-2. [x] Native-PDF adapter -> canonical; zone detection; tag parsing
-3. [x] Alignment (register -> bipartite match -> classify) + delta report
-4. [x] Scanned-PDF adapter (OCR) -- degradation ladder already generated
-5. [x] Chat with citation post-validation; refuse-on-unsupported
-6. [x] Tracer threaded through; eval runner + scorecard incl. llm_direct baseline
-   -- chat correctness (LLM-judge, validated 5/5 vs hand-checked)/
-   groundedness/refusal-accuracy metrics and the llm_direct baseline
-   (3x @ temperature=0, measured output variance) are both wired into
-   `make eval`'s scorecard now that a live LLM connection exists.
-7. [x] Markup overlay (bonus) -- `src/markup/overlay.py`, `make markup A=... B=...`
-
-Update checkboxes as steps land; keep README's "Plan" section as the
-narrative version of the same list (don't let the two drift — CLAUDE.md is
-the checklist, README explains the "so far" rationale).
-
-## Dataset (already built — use it, don't rebuild it)
+## Dataset
 
 `eval/datasets/generator/` emits seeded pairs with three-layer GT:
 - L1 `gt/elements_{a,b}.json` (inventory: measures extraction in isolation)
@@ -95,11 +89,18 @@ recalibrate `src/ingest/pdf_native.py` against real element density
 (~800 text + ~5000 geometry elements per sheet vs. the generator's ~80-120)
 and real layout (datasheet block bottom-left, not bottom-right as the
 generator assumes — `src/canonical/classify.py`'s Tier-2 region rects carry
-both as candidates). Redistribution rights confirmed. Known real-file gap:
-instrument bubbles split system/function/loop across three stacked
-baselines in the real drawings, unlike the generator's single-line format —
-`tests/test_pdf_native_real_samples.py` documents this as an expected
-failure (`xfail`), not silently passing.
+both as candidates). Redistribution rights confirmed. Real-file gap found and
+since closed: instrument bubbles split system/function/loop across three
+stacked baselines in the real drawings, unlike the generator's single-line
+format. It was carried as an `xfail` for a while rather than passed over
+silently, and is now handled by `_stack_instrument_bubbles`
+(`src/ingest/pdf_native.py`), a second pass gated on real circle geometry —
+`tests/test_pdf_native_real_samples.py` asserts it for real.
+
+A **held-out** set (`eval/datasets/holdout/`, `make eval-holdout`) sits
+alongside the seeded one: a real EPA P&ID that nothing is tuned against,
+scored by the identical code path and reported separately. Its numbers are
+the realism check on everything above — see `docs/findings.md`.
 
 ## Eval harness requirements
 
@@ -121,12 +122,17 @@ failure (`xfail`), not silently passing.
   through the identical metrics path; run 3× at temperature 0 and report
   output variance (the determinism argument, measured).
 
-## Working agreements
+## Engineering constraints
 
-- Python 3.11+, stdlib + deps in pyproject only; no LangChain/LlamaIndex.
-- Config over hardcoding: model, thresholds, paths from env/.env.
-- Tests where they matter: delta engine, tag parser, citation validator,
-  cascade grouping. `make test` must stay green.
-- Every commit leaves `make dataset && make eval` runnable.
-- README records every trade-off and every deliberate cut, including the
-  candid failure table once eval runs exist.
+- Python 3.11+, stdlib + deps declared in `pyproject.toml`; no LangChain or
+  LlamaIndex — the retrieval and agent loops here are small enough to own
+  outright, and owning them is what makes them instrumentable.
+- Config over hardcoding: model, thresholds and paths come from env/`.env`
+  (every tunable constant in the delta engine has an ablation path — see
+  `.env.example`).
+- Tests concentrate where correctness is load-bearing: the delta engine, tag
+  parsing, citation validation, cascade grouping, and resource hygiene.
+- `make dataset && make eval` stays runnable; the seeded dataset is
+  regenerated from seed 42, never committed.
+- Trade-offs, deliberate cuts and the candid failure table live in the
+  README and `docs/findings.md`.

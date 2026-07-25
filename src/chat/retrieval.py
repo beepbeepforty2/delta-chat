@@ -1,4 +1,4 @@
-"""Retrieval over PID A + PID B + delta report entries. CLAUDE.md decision
+"""Retrieval over PID A + PID B + delta report entries. DESIGN.md decision
 #7: "retrieval over PID A + PID B + delta-report JSON entries; every chunk
 carries {source, sheet, zone, element_id}."
 

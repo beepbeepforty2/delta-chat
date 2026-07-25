@@ -1,6 +1,6 @@
 """Native (vector) PDF adapter: fitz extraction -> canonical.
 
-Spike findings that drove this design (see PLAN in git history / CLAUDE.md
+Spike findings that drove this design (see PLAN in git history / DESIGN.md
 Steps #2 for the write-up): fitz's own block/line grouping in
 page.get_text("dict") already reassembles most word-fragmented text (the
 "alt" producer in eval/datasets/generator/render.py draws one word per

@@ -1,1 +1,0 @@
-{"q": "What changed between these two documents?", "expected_behavior": "refuse", "a": "These are different documents, not two revisions of one document.", "citations": ["tf_equip"]}

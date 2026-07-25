@@ -1,6 +1,6 @@
 """Delta P/R/F1: match predicted Delta records against GT deltas.json
 entries by (kind, sheet, zone), with description-similarity as a tiebreak
--- "zone + type" is the matching CLAUDE.md's eval requirements explicitly
+-- "zone + type" is the matching DESIGN.md's eval requirements explicitly
 allow as an alternative to full location-IoU matching.
 
 Semantic-null GT entries are excluded from the main P/R/F1 (matching them
@@ -11,7 +11,7 @@ proxy for how often the engine would be wrong if it never adjudicated
 nulls at all) and `semantic_null_detection` (direct precision/recall of
 the engine's own `Delta.semantic_null` flag against GT, now that
 src/delta/semantic_null.py exists -- a rule for the DELETED-placeholder
-case, opt-in LLM adjudication for reword-equivalence per CLAUDE.md
+case, opt-in LLM adjudication for reword-equivalence per DESIGN.md
 decision #3c). Both are kept: the first measures the cost of doing
 nothing, the second measures whether the actual detector is any good.
 """

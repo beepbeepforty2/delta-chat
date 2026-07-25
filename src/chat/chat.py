@@ -1,5 +1,5 @@
 """Grounded chat: retrieval -> LLM -> citation post-validation ->
-refuse-when-unsupported. CLAUDE.md decision #7.
+refuse-when-unsupported. DESIGN.md decision #7.
 
 The LLM's only role here (decision #3): write the answer prose with
 citations. Retrieval, citation parsing, and validation are all
@@ -67,7 +67,7 @@ def _render_context(chunks: list[Chunk]) -> str:
 
 @dataclass
 class LLMResult:
-    """Richer return type for call_llm, carrying the telemetry CLAUDE.md
+    """Richer return type for call_llm, carrying the telemetry DESIGN.md
     decision #8 requires LLM spans to capture (prompt/response/model/
     tokens/cost). A plain str is also accepted from call_llm (auto-wrapped
     below) so test fakes can stay simple -- only the real default call

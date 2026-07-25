@@ -1,6 +1,6 @@
 """Scanned (raster) PDF adapter: rasterize -> pytesseract OCR -> canonical.
 
-Spike findings that drove this design (see CLAUDE.md Steps #4 for the
+Spike findings that drove this design (see DESIGN.md Steps #4 for the
 write-up): tesseract's own word-level detections (level=5) are reliable,
 but its own line/block/par grouping is NOT -- it merged an entire row of
 widely-spaced zone-grid digits (~540px apart) into one polluted string on
@@ -16,7 +16,7 @@ a bigger lift than the OCR text path for the same time budget. Documented
 cut, not a silent gap.
 
 extraction_confidence is real per-element OCR confidence here (unlike
-pdf_native's always-1.0), per CLAUDE.md decision #1 ("1.0 native; OCR
+pdf_native's always-1.0), per DESIGN.md decision #1 ("1.0 native; OCR
 conf for scans") and src/canonical/model.py's own field comment.
 """
 from __future__ import annotations

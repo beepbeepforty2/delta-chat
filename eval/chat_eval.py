@@ -1,4 +1,4 @@
-"""Chat evaluation: CLAUDE.md's eval requirements name three metrics --
+"""Chat evaluation: DESIGN.md's eval requirements name three metrics --
 "correctness (LLM-judge, judged against 5 hand-checked answers to validate
 the judge -- report agreement) + deterministic groundedness (cited element
 ids exist and contain the claimed content) + refusal accuracy on
@@ -226,7 +226,7 @@ def score_correctness_aggregate(items: list[ChatEvalItem]) -> dict:
 class HandCheckedCase:
     """A real (question, expected, actual) transcript from a live run,
     manually reviewed once and frozen here as ground truth for judge
-    validation -- CLAUDE.md: "correctness (LLM-judge, judged against 5
+    validation -- DESIGN.md: "correctness (LLM-judge, judged against 5
     hand-checked answers to validate the judge -- report agreement)".
     Captured from real `python -m eval.chat_eval` transcripts during
     development, not invented -- see README's chat findings section for
@@ -315,12 +315,12 @@ HAND_CHECKED_SAMPLE: list[HandCheckedCase] = [
             "null_ident_900 is an identical clone -- there are zero real deltas, and the reference "
             "answer is '0 primary change(s)'. The system instead describes elements whose PRINTED "
             "TEXT happens to be the word 'DELETED.' (a pre-existing note-placeholder convention in "
-            "this drawing, present unchanged in both revisions -- see CLAUDE.md's DELETED-"
+            "this drawing, present unchanged in both revisions -- see DESIGN.md's DELETED-"
             "placeholder-collapse operator) as though they were newly-deleted changes. Every "
             "citation resolves to a real element, so this passes id-existence and would even "
             "plausibly pass a loose content-overlap check, but the substance is a hallucinated "
             "characterization of static content as change -- exactly the kind of null-pair false "
-            "positive CLAUDE.md's eval requirements call out as needing its own reporting column."
+            "positive DESIGN.md's eval requirements call out as needing its own reporting column."
         ),
     ),
 ]
@@ -328,7 +328,7 @@ HAND_CHECKED_SAMPLE: list[HandCheckedCase] = [
 
 def validate_judge(call_llm: Optional[Callable[[str, str], str]] = None) -> dict:
     """Runs the judge against HAND_CHECKED_SAMPLE and reports agreement
-    with the hand verdicts -- the actual, measured number CLAUDE.md's eval
+    with the hand verdicts -- the actual, measured number DESIGN.md's eval
     requirements ask for, not an assumed one."""
     results = []
     for case in HAND_CHECKED_SAMPLE:

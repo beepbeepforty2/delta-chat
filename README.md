@@ -320,7 +320,7 @@ dependencies, since those live in the `uv`-managed `.venv`.
 
 #### Verified, and what verifying it caught
 
-The image builds and the services run — `docker build` passes with **329
+The image builds and the services run — `docker build` passes with **339
 tests green inside the container**, and `docker compose run --rm demo` and
 `... eval` were both executed end to end. Building it for real immediately
 found two bugs that no amount of reading would have:
@@ -755,6 +755,8 @@ config/
   domain.yaml    BM25 query-alias table (chat retrieval)
 eval/
   datasets/generator/   seeded pair generator (model, ops, render, generate)
+  datasets/holdout/     held-out real EPA P&ID pair -- committed, never tuned
+                         against, scored separately (`make eval-holdout`)
   baselines/            llm_direct.py, backend_compare.py
   calibration.py        confidence-band precision check
   run_eval.py           scorecard: delta P/R/F1, calibration, semantic-null
@@ -763,7 +765,15 @@ data/samples/           provenance-documented real vendor P&IDs (see PROVENANCE.
 docs/
   architecture.{svg,html,txt,mmd}   pipeline diagram, four formats
   findings.md                       detailed engineering findings (see above)
+  DEMO_SCRIPT.md                    shot list for the video walkthrough
 tools/
   compare_models.py     same pair, same credential, different model names
   visual_diff.py        human-in-the-loop debug viewer
+  holdout/              builder for the held-out set (make_real_pair.py) and
+                         its source/licensing notes
+tests/                  339 tests; `make test`
 ```
+
+Root: [`DESIGN.md`](DESIGN.md) (decisions of record, cited from source
+docstrings), [`DEMO.md`](DEMO.md) (walkthrough with real captured output),
+[`docs/findings.md`](docs/findings.md) (what broke and why).

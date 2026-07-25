@@ -1,4 +1,4 @@
-"""LLM interface: one seam, swappable provider. CLAUDE.md decision #10:
+"""LLM interface: one seam, swappable provider. DESIGN.md decision #10:
 provider/model from env, keys never committed, prompt caching for the
 two-document context (added once chat's retrieval path exists).
 

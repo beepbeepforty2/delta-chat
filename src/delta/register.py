@@ -1,5 +1,5 @@
 """Registration: align page coordinate frames between A and B before
-spatial matching. CLAUDE.md decision #3: "page-level registration
+spatial matching. DESIGN.md decision #3: "page-level registration
 (similarity transform from high-confidence anchors)".
 
 For native-native pairs there is genuinely nothing to correct: both
@@ -12,7 +12,7 @@ silently compare misaligned coordinates without this step.
 
 Anchors are elements whose type is part of the drawing's fixed scaffolding
 -- title block fields, the equipment tag, border-grid zone labels -- which
-CLAUDE.md's own operator set (per-family renumbering, note rewording,
+DESIGN.md's own operator set (per-family renumbering, note rewording,
 DELETED-placeholder collapse) never touches. An anchor is only trusted
 when its content is IDENTICAL between A and B on the same sheet number AND
 unique within that sheet (ambiguous content, e.g. two identical zone

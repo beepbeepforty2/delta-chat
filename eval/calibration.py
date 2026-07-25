@@ -1,4 +1,4 @@
-"""Confidence calibration: CLAUDE.md decision #3 defines a confidence
+"""Confidence calibration: DESIGN.md decision #3 defines a confidence
 formula (match-cost margin x extraction_conf_a x extraction_conf_b, see
 src/delta/classify.py::_confidence) but nothing previously checked whether
 it's actually predictive of correctness. Buckets predicted deltas (matched

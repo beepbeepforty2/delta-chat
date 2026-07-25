@@ -1,5 +1,16 @@
 # Held-out real-P&ID test set — sources and procedure
 
+> **Status.** Two pairs are built and committed under
+> `eval/datasets/holdout/`: `holdout_raster_001` (two valve-symbol swaps on a
+> real EPA P&ID) and `holdout_null_001` (the producer-variation null
+> control). Run them with `make eval-holdout` — reported separately from the
+> seeded set, never pooled.
+>
+> The base for those pairs is a **raster** scan with no OCR-recoverable text
+> at any DPI, so it exercises the graphical path only. The remaining rows in
+> the table below are **not built**: a symbolic holdout needs a text-bearing
+> vector P&ID, which is why the source table is kept here rather than deleted.
+
 ## Why constructed, not found
 Matched pre/post revision pairs of the same P&ID are effectively absent from the
 public internet — revision history lives in controlled EDMS behind

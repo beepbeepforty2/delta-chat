@@ -1,6 +1,6 @@
 """Homegrown observability: context-manager spans, correlation id per
 request, per-span timings, JSONL structured logs, one JSON trace file per
-request. CLAUDE.md decision #8: zero infra, fully understood, vs OTel --
+request. DESIGN.md decision #8: zero infra, fully understood, vs OTel --
 see README for the justification.
 
 Usage:

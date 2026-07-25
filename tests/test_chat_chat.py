@@ -33,7 +33,7 @@ def test_answer_with_explicit_model_refusal():
 
 def test_answer_with_no_citations_is_forced_refusal():
     """Even if the model doesn't say REFUSED, an uncited answer must not
-    pass through -- CLAUDE.md decision #7: refuse when unsupported."""
+    pass through -- DESIGN.md decision #7: refuse when unsupported."""
     def fake_llm(system, user):
         return "The pipe class changed to FC11S."  # plausible, but no citation
 

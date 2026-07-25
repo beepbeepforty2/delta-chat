@@ -15,11 +15,11 @@ Source: assignment example materials. Redistribution rights confirmed.
 equipment (gas lift vs. gas export compressor), different duty/flow/stage
 count. Do not treat them as an edited A/B pair in tests; they're useful
 individually as extraction exemplars, and later as a real-world test case
-for the `not_a_pair` pre-check (CLAUDE.md decision #6, README Plan step 3).
+for the `not_a_pair` pre-check (DESIGN.md decision #6, README Plan step 3).
 
 Every operator in `eval/datasets/generator/ops.py` and the composite-tag
 regexes in `src/canonical/tags.py` were originally modeled on edits observed
-between this exact pair (see `CLAUDE.md`'s Dataset section) — these files
+between this exact pair (see `DESIGN.md`'s Dataset section) — these files
 are the ground truth those design decisions trace back to, not just
 incidental samples.
 

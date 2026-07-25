@@ -1,6 +1,6 @@
 """Semantic-null detection: two distinct mechanisms for two distinct
 sub-cases in the generator's own ops (eval/datasets/generator/ops.py),
-per CLAUDE.md decision #3(c) ("optional semantic-equivalence
+per DESIGN.md decision #3(c) ("optional semantic-equivalence
 adjudication ... isolated, cached, documented as the non-deterministic
 zone").
 

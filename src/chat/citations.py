@@ -1,9 +1,9 @@
-"""Fixed-format citations. CLAUDE.md decision #7: "Answers must emit
+"""Fixed-format citations. DESIGN.md decision #7: "Answers must emit
 citations in a fixed format; post-validate that cited IDs exist in the
 retrieved set; refuse when unsupported."
 
 Format: [source:sheet:zone:id], e.g. [A:1:F-7:el_a1b2c3d4e5f6] or
-[delta:1:B-2:delta0007]. Embeds the zone (CLAUDE.md decision #5: locations
+[delta:1:B-2:delta0007]. Embeds the zone (DESIGN.md decision #5: locations
 cite border-grid zones) directly in the citation, not just the id -- a
 reader sees *where* without a lookup, and post-validation still only needs
 the id field to check existence.
@@ -56,7 +56,7 @@ def validate_citations(citations: list[ParsedCitation], retrieved: list[Chunk]) 
     citation text doesn't independently invalidate it (the LLM could
     typo the display fields while getting the id right), but a citation
     whose id was never retrieved is always invalid -- that's the actual
-    "unsupported" case CLAUDE.md's refuse-when-unsupported requirement
+    "unsupported" case DESIGN.md's refuse-when-unsupported requirement
     means."""
     valid_ids = {c.id for c in retrieved}
     valid, invalid = [], []

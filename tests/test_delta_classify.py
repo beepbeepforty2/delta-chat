@@ -26,7 +26,7 @@ def test_confidence_is_product_not_min_of_both_sides():
     """Regression: an earlier version used min(ext_conf_a, ext_conf_b),
     which agrees with the product whenever both sides are 1.0 (every
     native-native pair) but silently overstates confidence once real
-    (<1.0) OCR confidence is involved -- CLAUDE.md decision #3 specifies
+    (<1.0) OCR confidence is involved -- DESIGN.md decision #3 specifies
     the product."""
     pair = MatchedPair(a=_el(0.5), b=_el(0.8), margin=1.0)
     assert _confidence(pair) == round(0.5 * 0.8, 4)

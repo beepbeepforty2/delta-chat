@@ -1,6 +1,6 @@
 """Alignment: sheet matching -> per-sheet bipartite element matching.
 
-CLAUDE.md decision #3: bipartite matching (scipy Hungarian), cost =
+DESIGN.md decision #3: bipartite matching (scipy Hungarian), cost =
 w_text*(1-text_sim) + w_spatial*dist. Confidence = match-cost margin
 (best vs second-best) x extraction_confidence (the latter applied in
 classify.py, where both elements of a matched pair are available).

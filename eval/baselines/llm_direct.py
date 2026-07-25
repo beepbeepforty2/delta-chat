@@ -1,5 +1,5 @@
 """Baseline arm: does the LLM need our deterministic alignment engine at
-all, or can it just be asked to diff two documents directly? CLAUDE.md's
+all, or can it just be asked to diff two documents directly? DESIGN.md's
 eval requirements name this explicitly: "both PDFs to the LLM with a
 delta-schema prompt, parsed into the same Delta type, scored through the
 identical metrics path; run 3x at temperature 0 and report output variance
