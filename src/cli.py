@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from pathlib import Path
 
 from src.canonical.model import CanonicalDocument
 from src.chat.chat import answer as chat_answer
@@ -18,6 +19,7 @@ from src.delta.report import write_report
 from src.delta.semantic_null import annotate_semantic_null
 from src.delta.severity import annotate_severity
 from src.ingest.base import FormatAdapter
+from src.markup.html_report import render_html_report
 from src.markup.overlay import render_markup
 from src.markup.pdf_annotate import render_pdf_markup
 from src.ingest.dwg import DWGAdapter
@@ -129,6 +131,18 @@ def cmd_run(args: argparse.Namespace) -> int:
                 json_path, md_path = write_report(deltas, args.a, args.b, args.out)
                 s.set("json_path", json_path)
                 s.set("md_path", md_path)
+
+            if args.html:
+                # Opt-in end-user report: a self-contained HTML file with
+                # annotated pages + a filterable delta list, distinct from
+                # `markup`'s output (real PDF annotations / PNG preview) --
+                # this is the "show me in a webpage" view, off by default
+                # so a normal run stays report.json/.md only.
+                with tracer.span("html_report") as s:
+                    html_path = render_html_report(doc_a, doc_b, deltas, args.a, args.b,
+                                                    str(Path(args.out) / "report.html"))
+                    s.set("html_path", html_path)
+                    print(f"wrote {html_path}")
 
             primary = sum(1 for d in deltas if not d.is_cascade)
             cascade = sum(1 for d in deltas if d.is_cascade)
@@ -262,6 +276,9 @@ def main() -> int:
     run_p.add_argument("--a", required=True)
     run_p.add_argument("--b", required=True)
     run_p.add_argument("--out", default="reports/")
+    run_p.add_argument("--html", action="store_true",
+                        help="also write an interactive report.html (annotated pages + "
+                             "filterable delta list) alongside the json/md report")
     run_p.set_defaults(func=cmd_run)
 
     chat_p = sub.add_parser("chat", help="grounded chat over PID A + PID B + delta report")

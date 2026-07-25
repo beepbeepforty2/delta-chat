@@ -341,6 +341,49 @@ inspected both by listing the real annotation objects (content strings
 matching each delta's own description exactly) and by rendering the
 annotated PDF to an image and looking at it.
 
+### A third markup path: an interactive report for the end user, not the reviewer
+
+Both paths above assume the audience already has a PDF markup tool open.
+`src/markup/html_report.py` (opt-in, `run --html`) targets a different
+audience: the person who asked for the diff, wants to see it, and
+shouldn't need Acrobat or a terminal to do so. It's a single
+self-contained HTML file — same two-pane-plus-sidebar shape as
+`tools/visual_diff.py`'s debug viewer, reused deliberately for the layout
+only; the data underneath is the real engine's own `Delta` objects, not
+that tool's independent naive matcher. Reusing a debug tool's *UI shape*
+while refusing to reuse its *matching logic* is the same principle
+CLAUDE.md decision #2 applies to comparison generally: a good layout
+isn't the thing that was supposed to stay independent, the matcher was.
+
+Two implementation choices worth recording:
+
+- **Boxes are positioned client-side as raw bbox percentages**, not
+  denormalized to pixels server-side the way `overlay.py`'s PIL path
+  does. `CanonicalElement.bbox` is already normalized [0,1] against the
+  same raster both adapters retain, so `left: x0*100%` is correct with no
+  pixel-size lookup at all — simpler than the PNG path, which only
+  denormalizes because PIL draws server-side and needs real pixel
+  coordinates to do it.
+- **`_collect_boxes()` (`overlay.py`) was changed to yield whole `Delta`
+  objects** instead of a hand-picked `(kind, is_cascade, description)`
+  tuple, once a third consumer needed fields the first two never did
+  (severity, confidence, semantic_null, zone). `pdf_annotate.py`'s
+  unpacking loop had to be updated in the same change — a real,
+  momentarily-broken intermediate state (a `ValueError` on tuple
+  unpacking) caught by re-running `tests/test_markup_pdf_annotate.py`
+  before moving on, not by inspection alone.
+
+`unclassified_visual_change` deltas (from the opt-in raster recall net)
+have no `id_a`/`id_b` by construction — no element for `_collect_boxes` to
+resolve a box against. Rather than silently drop them from the report the
+way they're silently absent from the two PDF-based markup paths (neither
+of which has anywhere to show a delta with no box at all), the sidebar
+lists them anyway, tagged "no exact location — zone only," since the
+entire point of that pass is surfacing what extraction missed — hiding it
+a second time here would defeat it. Live-verified against `edited_003`
+(`tests/test_markup_html_report.py::test_render_html_report_real_pair_end_to_end`)
+and by opening the generated `report.html` directly.
+
 ## Severity ranking
 
 No eval ground truth exists for this (the dataset generator predates the

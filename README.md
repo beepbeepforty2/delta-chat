@@ -53,10 +53,20 @@ inspection or unit tests alone.
 make install
 make dataset          # generates eval/datasets/v0 (seeded, reproducible)
 make run A=path/to/revA.pdf B=path/to/revB.pdf     # delta report
+make html-report A=path/to/revA.pdf B=path/to/revB.pdf  # + an interactive report.html
 make markup A=path/to/revA.pdf B=path/to/revB.pdf  # annotated PDFs
 make chat A=path/to/revA.pdf B=path/to/revB.pdf    # grounded Q&A (needs an LLM credential, see .env.example)
 make eval             # full scorecard against the seeded dataset
 ```
+
+`make html-report` (`src.cli run --html`) writes `reports/report.html` alongside
+the usual json/md — a single self-contained file (rasters inlined, no
+external assets) with both revisions' pages side by side, delta boxes
+colored by kind, and a filterable/searchable sidebar (kind, severity,
+cascade toggle, free-text search) that stays in sync with the page view.
+It's the end-user-facing view of the same real `Delta` objects the json/md
+report renders — opt-in and off by default so a plain `make run` doesn't
+pay for it.
 
 Format (native vs. scanned) is auto-detected per file — no flag needed.
 If the two files aren't actually revisions of the same drawing (different
@@ -197,12 +207,21 @@ raster recall net for scanned-input extraction misses. Full detail on all
 of the above, including what each one's live testing actually caught, is
 in [`docs/findings.md`](docs/findings.md).
 
+Also: an opt-in interactive HTML report (`--html`, see Quick start) — the
+end-user-facing counterpart to `report.py`'s json/md, reusing
+`tools/visual_diff.py`'s two-pane-plus-sidebar layout but powered by the
+real delta engine's output rather than that tool's own independent naive
+matcher.
+
 ## Deliberately not built
 
 - **DWG parsing** — a real stub behind a real seam (`src/ingest/dwg.py`
   documents the ODA/LibreDWG→DXF→ezdxf path); the generator's DXF leg
   proves entity compatibility without needing a full parser.
-- **A web UI** — CLI only.
+- **A served web app** — the CLI can emit a webpage (`--html`, a static,
+  self-contained file, see Quick start) but there's no server, no
+  multi-user state, no upload flow; every run is still `python -m src.cli
+  run --a ... --b ...` on the command line.
 - **Multi-hundred-sheet scaling** — this project targets single-sheet
   pairs; the sheet-matching stage and per-sheet delta design leave the
   parallelization seam in place, but it isn't exercised.

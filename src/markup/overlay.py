@@ -40,6 +40,12 @@ COLORS: dict[str, tuple[int, int, int]] = {
     "remove": (200, 30, 30),   # red
     "modify": (222, 145, 0),   # amber
     "move": (30, 100, 220),    # blue
+    "unclassified_visual_change": (124, 58, 168),  # violet -- never actually
+    # drawn as a page box here (raster_recall.py deltas have no id_a/id_b,
+    # so _collect_boxes below never resolves an element for them), but
+    # kept in this shared palette so html_report.py's list view (which
+    # does surface these, without a box) uses the same kind-color
+    # vocabulary as the rest of the project rather than inventing its own.
 }
 PRIMARY_WIDTH = 4
 CASCADE_WIDTH = 2
@@ -81,21 +87,21 @@ def _draw_legend(img: Image.Image) -> None:
 
 
 def _collect_boxes(deltas: list[Delta], els_a: dict, els_b: dict) -> tuple[dict, dict]:
-    """sheet -> [(CanonicalElement, kind, is_cascade, description)] for A
-    and B -- description is carried through for src/markup/pdf_annotate.py
-    (a real PDF annotation's content is what shows up in Acrobat's/
-    Bluebeam's comment list); the PNG path below doesn't need it but takes
-    the same 4-tuple shape so both markup paths share this one collection
-    pass rather than duplicating the delta -> element -> bbox resolution."""
+    """sheet -> [(CanonicalElement, Delta)] for A and B. Yields the whole
+    Delta, not a hand-picked subset of its fields: pdf_annotate.py needs
+    kind/is_cascade/description, html_report.py additionally needs
+    severity/confidence/semantic_null/zone/id -- passing the full object
+    means a new consumer never has to grow this function's return shape
+    again, it just reads what it needs off the Delta itself."""
     by_sheet_a: dict[int, list] = {}
     by_sheet_b: dict[int, list] = {}
     for d in deltas:
         el_a = els_a.get(d.id_a) if d.id_a else None
         el_b = els_b.get(d.id_b) if d.id_b else None
         if el_a is not None:
-            by_sheet_a.setdefault(d.sheet, []).append((el_a, d.kind, d.is_cascade, d.description))
+            by_sheet_a.setdefault(d.sheet, []).append((el_a, d))
         if el_b is not None:
-            by_sheet_b.setdefault(d.sheet, []).append((el_b, d.kind, d.is_cascade, d.description))
+            by_sheet_b.setdefault(d.sheet, []).append((el_b, d))
     return by_sheet_a, by_sheet_b
 
 
@@ -103,11 +109,11 @@ def _annotate(raster_path: str, entries: list, legend: bool) -> Image.Image:
     base = Image.open(raster_path).convert("RGBA")
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay, "RGBA")
-    for el, kind, is_cascade, _description in entries:
+    for el, d in entries:
         box = _denormalize(el, base.size)
-        width = CASCADE_WIDTH if is_cascade else PRIMARY_WIDTH
-        filled = not is_cascade and kind != "move"
-        _draw_box(draw, box, COLORS[kind], width, filled)
+        width = CASCADE_WIDTH if d.is_cascade else PRIMARY_WIDTH
+        filled = not d.is_cascade and d.kind != "move"
+        _draw_box(draw, box, COLORS[d.kind], width, filled)
     composited = Image.alpha_composite(base, overlay)
     if legend:
         _draw_legend(composited)

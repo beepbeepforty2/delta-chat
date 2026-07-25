@@ -47,23 +47,22 @@ def _rgb_float(color: tuple[int, int, int]) -> tuple[float, float, float]:
 
 
 def _annotate_page(page: "fitz.Page", entries: list) -> None:
-    """entries: [(CanonicalElement, kind, is_cascade, description)], from
-    overlay.py::_collect_boxes."""
+    """entries: [(CanonicalElement, Delta)], from overlay.py::_collect_boxes."""
     w, h = page.rect.width, page.rect.height
-    for el, kind, is_cascade, description in entries:
+    for el, d in entries:
         b = el.bbox
         rect = fitz.Rect(b.x0 * w, b.y0 * h, b.x1 * w, b.y1 * h)
         annot = page.add_rect_annot(rect)
-        color = _rgb_float(COLORS[kind])
-        filled = not is_cascade and kind != "move"
+        color = _rgb_float(COLORS[d.kind])
+        filled = not d.is_cascade and d.kind != "move"
         if filled:
             annot.set_colors(stroke=color, fill=color)
             annot.set_opacity(FILL_OPACITY)
         else:
             annot.set_colors(stroke=color)
             annot.set_opacity(MOVE_OPACITY)
-        annot.set_border(width=CASCADE_BORDER_WIDTH if is_cascade else PRIMARY_BORDER_WIDTH)
-        annot.set_info(content=description or f"{kind} ({el.type})", title=f"delta-chat: {kind}")
+        annot.set_border(width=CASCADE_BORDER_WIDTH if d.is_cascade else PRIMARY_BORDER_WIDTH)
+        annot.set_info(content=d.description or f"{d.kind} ({el.type})", title=f"delta-chat: {d.kind}")
         annot.update()
 
 

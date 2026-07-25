@@ -38,8 +38,10 @@ flowchart TD
         RR --> RPT["report.py\ndelta_report.json / .md\nseverity-sorted"]
         RR --> MKP["markup/pdf_annotate.py (default)\nreal PDF Square annotations\non the original PDFs"]
         RR --> MKPNG["markup/overlay.py (--format png)\nraster PNG preview, legended"]
+        RR --> HTMLR["markup/html_report.py (run --html)\nself-contained interactive report,\nfilterable sidebar, opt-in"]
         CD --> MKP
         CD --> MKPNG
+        CD --> HTMLR
     end
 
     subgraph Chat["src/chat/ — grounded Q&A"]
@@ -74,3 +76,4 @@ flowchart TD
         BC["backend_compare.py\nmulti-backend cost/latency\n(scaffolded — needs a 2nd credential)"]
         VD["visual_diff.py\nnaive independent matcher,\nhuman-in-the-loop debug viewer"]
     end
+    VD -.layout reused, matcher not.-> HTMLR

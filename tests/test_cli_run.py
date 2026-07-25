@@ -13,8 +13,8 @@ PAIRS_DIR = pathlib.Path(__file__).parent.parent / "eval" / "datasets" / "v0" / 
 
 
 class _Args:
-    def __init__(self, a, b, out):
-        self.a, self.b, self.out = a, b, out
+    def __init__(self, a, b, out, html=False):
+        self.a, self.b, self.out, self.html = a, b, out, html
 
 
 def test_run_produces_report_and_trace(tmp_path, monkeypatch):
@@ -48,6 +48,29 @@ def test_run_produces_report_and_trace(tmp_path, monkeypatch):
     lines = events_file.read_text().splitlines()
     assert len(lines) > 5
     assert all(json.loads(l)["correlation_id"] == trace["correlation_id"] for l in lines)
+
+
+def test_run_with_html_flag_also_writes_report_html(tmp_path, monkeypatch):
+    """--html is opt-in (default False, covered by test_run_produces_report_
+    and_trace above never touching report.html) -- this is the flag's own
+    positive path, through the real cmd_run, not just html_report.py in
+    isolation."""
+    pair_dir = PAIRS_DIR / "edited_002"
+    if not pair_dir.exists():
+        pytest.skip("run `make dataset` first")
+
+    trace_dir = tmp_path / "traces"
+    monkeypatch.setenv("TRACE_DIR", str(trace_dir))
+    monkeypatch.setattr(tracer_mod, "TRACE_DIR", str(trace_dir))
+
+    out_dir = tmp_path / "reports"
+    args = _Args(str(pair_dir / "a" / "L0.pdf"), str(pair_dir / "b" / "L0.pdf"), str(out_dir), html=True)
+    rc = cmd_run(args)
+    assert rc == 0
+
+    assert (out_dir / "delta_report.json").exists()
+    assert (out_dir / "report.html").exists()
+    assert "__DATA_JSON__" not in (out_dir / "report.html").read_text()
 
 
 def test_run_failure_still_writes_trace(tmp_path, monkeypatch):

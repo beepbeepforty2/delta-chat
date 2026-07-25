@@ -101,12 +101,12 @@
                                                         +-------------------------------+
                                                               |                |
                                                               v                v
-                          +---------------------------+  +-------------------------------+  +----------------------------+
-                          |  report.py                 |  |  markup/pdf_annotate.py        |  |  markup/overlay.py          |
-                          |  delta_report.json / .md    |  |  (default)                     |  |  (--format png)             |
-                          |  severity-sorted            |  |  real PDF Square annotations   |  |  raster PNG preview,        |
-                          |                              |  |  on the original PDFs          |  |  legended                  |
-                          +---------------------------+  +-------------------------------+  +----------------------------+
+                          +---------------------------+  +-------------------------------+  +----------------------------+  +----------------------------+
+                          |  report.py                 |  |  markup/pdf_annotate.py        |  |  markup/overlay.py          |  |  markup/html_report.py      |
+                          |  delta_report.json / .md    |  |  (default)                     |  |  (--format png)             |  |  (run --html, opt-in)       |
+                          |  severity-sorted            |  |  real PDF Square annotations   |  |  raster PNG preview,        |  |  self-contained interactive |
+                          |                              |  |  on the original PDFs          |  |  legended                  |  |  report, filterable sidebar |
+                          +---------------------------+  +-------------------------------+  +----------------------------+  +----------------------------+
 
                                                                        |
                                                                        v
@@ -204,7 +204,9 @@
                            (scaffolded -- needs a 2nd credential to actually run)
    - visual_diff.py       naive, independent greedy matcher + human-in-the-loop
                            HTML debug viewer (deliberately not the real engine,
-                           a sanity check against it)
+                           a sanity check against it) -- its two-pane-plus-
+                           sidebar layout is reused by markup/html_report.py
+                           above; its naive matcher is not
 
 --------------------------------------------------------------------------------
 Legend

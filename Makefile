@@ -1,10 +1,12 @@
-.PHONY: install dataset run chat eval markup visual-diff trace test
+.PHONY: install dataset run html-report chat eval markup visual-diff trace test
 install:
 	uv sync --extra dev
 dataset:            ## generate labeled eval pairs (seeded, reproducible)
 	cd eval/datasets && uv run python -m generator.generate --out v0 --n 6 --seed 42
 run:                ## ingest a pair and produce a delta report
 	uv run python -m src.cli run --a $(A) --b $(B) --out reports/
+html-report:        ## same as run, plus an interactive reports/report.html
+	uv run python -m src.cli run --a $(A) --b $(B) --out reports/ --html
 chat:
 	uv run python -m src.cli chat --a $(A) --b $(B)
 eval:
