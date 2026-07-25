@@ -560,6 +560,143 @@ matcher.
   comparison. `tools/compare_models.py` covers the lighter, more common
   case of comparing model names under one shared credential.
 
+## What I'd do next with more time
+
+Ordered by measured pain, not by interest. Each item names the number in the
+scorecard it exists to move and the seam it would attach to — the layered IR
+was designed with these in mind, which is why most are additive rather than
+rewrites.
+
+### 1. L3 embeddings: semantic similarity, in the two places it actually pays
+
+**The measured pain.** `DEMO.md` exchange 2d is the cleanest example: asked
+which notes were *"deleted or reworded"*, retrieval missed two real changes
+whose delta descriptions say *"content changed"* and *"note removed"*. BM25
+cannot bridge that — it matches tokens, and the question and the answer share
+none of the right ones. `config/domain.yaml`'s alias table is a curated
+patch over the same hole, and it only scales as far as someone maintains it.
+Chat correctness sits at **0.70** and groundedness at **0.71**; retrieval
+recall is the ceiling on both.
+
+**Where it attaches.** L3 is already declared in `src/canonical/model.py`'s
+layering with a deliberate constraint worth keeping: *embeddings are a
+match-cost term, never a citation target.* Two consumers:
+
+- **Retrieval** (`src/chat/retrieval.py`) — hybrid BM25 + dense, fused with
+  reciprocal-rank fusion rather than replacing the lexical leg. Exact tag
+  strings (`26-KA-901`, `AC21`) are precisely where lexical matching wins and
+  embeddings blur; a P&ID is full of near-identical identifiers where a
+  dense-only retriever would be actively worse. Hybrid, not swap.
+- **`align.py`'s cost function** — a third term alongside text and spatial,
+  gated to low weight. It would catch the reworded-note case (`"OIL CHANGE BY
+  USING TEMPORARY ARRANGEMENT WITH HOSES."` → `"OIL CHANGE USING TEMPORARY
+  HOSE ARRANGEMENT."`) that rapidfuzz scores as a weak match today, and feed
+  `semantic_null.py` a rule-based signal where it currently needs an LLM call.
+
+**The cost to be honest about.** Determinism. The delta engine is currently
+reproducible end to end (verified: byte-identical reports across macOS and
+Linux). A local, pinned, CPU embedding model keeps that; a hosted embedding
+API does not, and would put a network call in the one path that is currently
+guaranteed offline. I would pin a small local model and version the weights
+before I would take an API's quality.
+
+### 2. L2 relations: make the drawing a graph, not a bag of elements
+
+**The measured pain.** `remove` precision is **0.00** on L0 — every removal
+the engine reports on the edited pairs is a false positive. The root cause is
+structural: elements are matched independently, so nothing knows that a valve
+tag *belongs to* the valve symbol beside it, or that a note is *referenced by*
+a DCN callout. When one member of a group is matched badly, nothing pulls its
+siblings along.
+
+**Where it attaches.** `CanonicalElement.relations: list[tuple[str, str]]`
+already exists at `src/canonical/model.py:39` — declared, never written to.
+Populating it is the whole feature:
+
+- **Containment** — text inside an instrument bubble. The geometry to do this
+  already runs: `_stack_instrument_bubbles` in `src/ingest/pdf_native.py`
+  computes exactly this circle-contains-token relation and then throws the
+  structure away after composing the string. Emitting a relation instead of
+  discarding it is close to free.
+- **Text↔symbol association** — a valve tag and its glyph, currently only
+  implicitly linked by `raster_join.py`'s `tag_proximity_norm` padding.
+- **Reference edges** — `dcn_note` → the notes it cites; these are already
+  parsed into `attrs["dcns"]` and simply not linked.
+
+Then matching becomes **graph-aware**: score a candidate pairing partly on
+whether its neighbours also matched. That is the standard fix for exactly the
+failure mode here — a locally-plausible wrong match that is obviously wrong
+one hop out. It would also let cascade detection link to the true root cause
+rather than an arbitrary group member, which `src/delta/classify.py`'s own
+docstring already flags as a known gap.
+
+### 3. Visual geometry awareness: make the raster stage understand shape
+
+**The measured pain.** Raster recall lift is **0.0** — the opt-in CV stage
+contributed nothing on this dataset — and the producer-variation null pair
+still emits **61** residue regions. Two distinct, diagnosed causes:
+
+- **Regions are blobs, not shapes.** `raster_diff.py` proposes connected
+  components with an area and a mean magnitude. A region knows *where* it is
+  and *how much* changed, never *what* it is. The `unclassified_visual_change`
+  label is honest precisely because the stage genuinely cannot say more.
+- **Suppression is per-element, so it fails on large regions.** The
+  text-confirmed-unchanged check asks "does *one* element's bbox account for
+  this region?" — the right question for a tag-sized region, the wrong one for
+  a region covering 62% of the page after morphological dilation merges
+  hundreds of per-glyph font differences.
+
+**What I would build, in order:**
+
+1. **Union-coverage suppression** — accumulate coverage across *all* matched,
+   content-identical elements overlapping a region instead of testing one at a
+   time. This is the direct fix for the 61 residue regions and needs no new
+   dependency. Highest value per unit of work in this whole list.
+2. **Vector-native geometry diffing.** For native PDFs the vector paths are
+   right there in `page.get_drawings()` — currently flattened to a bbox and a
+   coarse `geom_kind`. Diffing actual path geometry (endpoints, segment counts,
+   topology) would catch a rerouted line as a *route* change rather than as
+   "some pixels differ", and would fix a real weakness in `align.py`: geometry
+   elements have empty content, so `_text_sim` is always `1.0` and shape
+   contributes *zero* cost signal beyond the `geom_kind` bucketing added after
+   the matcher was caught pairing a line against a circle.
+3. **Symbol recognition.** Template matching first (P&ID symbol sets are
+   small, closed, and standardized — ISA-5.1), a small trained classifier only
+   if that plateaus. This is what turns `unclassified_visual_change` into
+   `"gate valve → globe valve"`, which is the answer a reviewer actually wants.
+4. **Connectivity extraction** — trace line-work into a topological graph of
+   what connects to what. This is the genuinely hard one and the most
+   valuable: it makes *"is this line still routed to the same vessel?"* a
+   question the system can answer at all. It also feeds straight back into
+   item 2 as another relation type.
+
+### 4. Fixing what the scorecard already says is broken
+
+Not new capability — just the numbers the eval is currently shouting about:
+
+- **L2 (scanned) precision 0.13**, 217 false positives. OCR noise is treated
+  as content. Needs OCR-confidence-weighted matching and a noise model, not
+  more matching cleverness.
+- **Confidence is inverted on L2** — the `0.9-1.0` band scores precision
+  `0.00` while `0.0-0.5` scores `0.146`. A confidence signal that
+  anti-correlates with correctness is worse than none, because people act on
+  it. I would fix this before adding any new feature.
+- **`semantic_null` rule recall 0.14** — the rule half catches one case in
+  seven; the LLM half is off by default.
+
+### Deliberately *not* on this list
+
+- **An LLM in the core delta path.** The `llm_direct` baseline already scores
+  higher F1 (0.90 vs 0.84) on this dataset, and I could close the gap fastest
+  by calling a model. I would not: it costs determinism, bounding boxes,
+  per-stage traces, and a confidence signal — everything that makes the output
+  reviewable. The right place for an LLM here is adjudicating a *specific*
+  ambiguity (`semantic_null.py`), which is where the one optional call already
+  sits.
+- **A bigger synthetic dataset.** More seeded pairs would make the numbers
+  smoother without making them more true. Real vendor pairs are what this
+  needs, and they're the scarce input.
+
 ## Repo layout
 
 ```
