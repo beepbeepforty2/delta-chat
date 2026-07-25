@@ -5,6 +5,8 @@ native PDF, scanned PDF, or DWG), compute a structured delta, emit a
 human+machine-readable delta report with real PDF markup annotations, and
 chat over both revisions and the delta with citations.
 
+**Video walkthrough:** https://youtu.be/C2SbISJMrWI
+
 **License:** shared publicly for hiring-assessment evaluation only — see
 [LICENSE](LICENSE). No rights are granted to use this code beyond
 evaluation without prior written permission.

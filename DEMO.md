@@ -1,5 +1,7 @@
 # DEMO — one delta, one grounded chat exchange, one scorecard
 
+**Video walkthrough:** https://youtu.be/C2SbISJMrWI
+
 Every command, output, and number below is **verbatim from a real run** on
 this repo — nothing is illustrative or reconstructed. Reproduce any of it
 with the commands shown.
