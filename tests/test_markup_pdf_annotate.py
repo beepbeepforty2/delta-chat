@@ -110,6 +110,32 @@ def test_render_pdf_markup_cascade_gets_no_fill(tmp_path):
     assert annots_b[0].colors["fill"] == []  # cascade: outline only, no fill
 
 
+def test_render_pdf_markup_handles_degenerate_zero_area_bbox(tmp_path):
+    """A perfectly horizontal or vertical geom_line has a zero-width or
+    zero-height bbox by construction (pdf_native.py's own docstring: a
+    real element, not an extraction bug) -- fitz.Rect(...) for such a box
+    is degenerate, and add_rect_annot() raises "rect is infinite or
+    empty" on it unless the box is padded first. Caught via a real vendor
+    P&ID pair with hand-edited valve geometry (straight triangle edges
+    are exactly horizontal/vertical) -- this reproduces it minimally."""
+    pdf_a = _blank_pdf(tmp_path / "a.pdf")
+    pdf_b = _blank_pdf(tmp_path / "b.pdf")
+    el_a = _el("a1", "", 0.4, 0.4, 0.4, 0.5, type_="geometry")  # x0 == x1
+    el_b = _el("b1", "", 0.4, 0.6, 0.6, 0.6, type_="geometry")  # y0 == y1
+    doc_a = _doc("A", [el_a])
+    doc_b = _doc("B", [el_b])
+    deltas = [
+        Delta("d1", "remove", "geometry", "a1", None, 1, "A-1", None, {}, 1.0, description="line removed"),
+        Delta("d2", "add", "geometry", None, "b1", 1, None, "A-1", {}, 1.0, description="line added"),
+    ]
+
+    out_a, out_b = render_pdf_markup(doc_a, doc_b, deltas, pdf_a, pdf_b, str(tmp_path / "out"))
+    _doc_a, _page_a, annots_a = _first_page_annots(out_a)
+    _doc_b, _page_b, annots_b = _first_page_annots(out_b)
+    assert len(annots_a) == 1
+    assert len(annots_b) == 1
+
+
 def test_render_pdf_markup_real_pair_end_to_end():
     pair_dir = PAIRS_DIR / "edited_003"
     if not pair_dir.exists():

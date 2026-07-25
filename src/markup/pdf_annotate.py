@@ -40,6 +40,13 @@ PRIMARY_BORDER_WIDTH = 2.5
 CASCADE_BORDER_WIDTH = 1.0
 FILL_OPACITY = 0.25  # primary, filled annotations only -- translucent so page content stays legible
 MOVE_OPACITY = 0.9   # move is outline-only (no fill), so its own opacity can stay high
+PAD_PT = 1.5  # points -- a perfectly horizontal or vertical geom_line has a
+              # zero-height/width bbox by construction (see pdf_native.py's
+              # own docstring: this is a real element, not an extraction
+              # bug), and add_rect_annot() raises "rect is infinite or
+              # empty" on a degenerate rect. overlay.py's PNG path already
+              # pads for exactly this reason (its PAD_PX); this is that
+              # same fix in point-space instead of raster pixels.
 
 
 def _rgb_float(color: tuple[int, int, int]) -> tuple[float, float, float]:
@@ -49,9 +56,11 @@ def _rgb_float(color: tuple[int, int, int]) -> tuple[float, float, float]:
 def _annotate_page(page: "fitz.Page", entries: list) -> None:
     """entries: [(CanonicalElement, Delta)], from overlay.py::_collect_boxes."""
     w, h = page.rect.width, page.rect.height
+    page_rect = page.rect
     for el, d in entries:
         b = el.bbox
-        rect = fitz.Rect(b.x0 * w, b.y0 * h, b.x1 * w, b.y1 * h)
+        rect = fitz.Rect(b.x0 * w - PAD_PT, b.y0 * h - PAD_PT,
+                          b.x1 * w + PAD_PT, b.y1 * h + PAD_PT) & page_rect
         annot = page.add_rect_annot(rect)
         color = _rgb_float(COLORS[d.kind])
         filled = not d.is_cascade and d.kind != "move"
