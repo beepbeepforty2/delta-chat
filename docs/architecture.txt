@@ -82,30 +82,47 @@
                                                         |  severity.py                   |
                                                         |  CRITICAL / HIGH / MEDIUM / LOW|
                                                         +-------------------------------+
+                                                                       |
+                                                                       v
+                                                        +-------------------------------+
+                                                        |  semantic_null.py               |
+                                                        |  rule (DELETED-collapse,        |
+                                                        |  always on) + opt-in LLM        |
+                                                        |  adjudication (reword)          |
+                                                        +-------------------------------+
+                                                                       |
+                                                                       v
+                                                        +-------------------------------+
+                                                        |  raster_recall.py (opt-in)      |
+                                                        |  confidence-gated registered    |
+                                                        |  pixel diff ->                  |
+                                                        |  unclassified_visual_change,    |
+                                                        |  low confidence                 |
+                                                        +-------------------------------+
                                                               |                |
                                                               v                v
-                                          +-------------------------+  +-------------------------------+
-                                          |  report.py               |  |  markup/overlay.py             |
-                                          |  delta_report.json / .md |  |  annotated raster PNGs         |
-                                          |                          |  |  (add/remove/modify/move,      |
-                                          |                          |  |   colored + legended)          |
-                                          +-------------------------+  +-------------------------------+
+                          +---------------------------+  +-------------------------------+  +----------------------------+
+                          |  report.py                 |  |  markup/pdf_annotate.py        |  |  markup/overlay.py          |
+                          |  delta_report.json / .md    |  |  (default)                     |  |  (--format png)             |
+                          |  severity-sorted            |  |  real PDF Square annotations   |  |  raster PNG preview,        |
+                          |                              |  |  on the original PDFs          |  |  legended                  |
+                          +---------------------------+  +-------------------------------+  +----------------------------+
 
                                                                        |
                                                                        v
    ============================================================================
    src/chat/  -- grounded Q&A                     (also consumes CanonicalDocument
    ============================================================================    A + B directly, alongside deltas)
-                                          +-------------------------------+
-                                          |  retrieval.py                  |
-                                          |  build_chunks(A, B, deltas)    |
-                                          +-------------------------------+
-                                                        |
-                                                        v
+                                          +-------------------------------+     +-------------------------------+
+                                          |  retrieval.py                  |<--- |  config/domain.yaml            |
+                                          |  build_chunks(A, B, deltas)    |     |  query-alias expansion          |
+                                          +-------------------------------+     |  (trip->sd/hh/ll, spec->        |
+                                                        |                       |   pipe_class, ...) -- additive  |
+                                                        v                       +-------------------------------+
                                           +-------------------------------+
                                           |  BM25Index                     |
                                           |  homegrown Okapi BM25,         |
-                                          |  delta-source boost,           |
+                                          |  delta-source boost 1.5x,      |
                                           |  zone-aware indexing           |
                                           +-------------------------------+
                                                         |
@@ -117,6 +134,7 @@
                                                         v
                                           +-------------------------------+
                                           |  llm.py                        |
+                                          |  get_client()/MODEL --          |
                                           |  GLM via Anthropic-compatible  |
                                           |  API (base_url + auth_token)   |
                                           +-------------------------------+
@@ -141,37 +159,52 @@
    Tracer: spans . correlation id . per-span timings . JSONL structured logs .
    one JSON trace file per request . LLM span telemetry (prompt/response/
    model/tokens/cost)
-   instruments  --->  Ingest, Delta Engine (register/align/classify spans),
-                       and Chat (retrieval + chat_answer spans)
+   instruments  --->  Ingest, Delta Engine (register/align/classify/severity/
+                       semantic_null/raster_recall spans), and Chat (retrieval
+                       + chat_answer spans)
 
    ============================================================================
    eval/  -- harness
    ============================================================================
-   +-------------------------------+          +-------------------------------+
-   |  datasets/generator            |          |  baselines/llm_direct.py       |
-   |  seeded pairs + 3-layer GT     |          |  3x @ temperature=0,           |
-   |  (elements / correspondence /  |          |  scored through the identical  |
-   |   deltas)                      |          |  score_pair path                |
-   +-------------------------------+          +-------------------------------+
-                    \                                    /
-                     \                                  /
-                      v                                v
-                        +-------------------------------+
-                        |  run_eval.py                   |   <--- also reads
-                        +-------------------------------+        delta_report.json
-                                       |                          and ChatAnswer output
-                                       v
+   +-------------------------------+   +-------------------------------+   +-------------------------------+
+   |  datasets/generator            |   |  calibration.py                |   |  baselines/llm_direct.py       |
+   |  seeded pairs + 3-layer GT     |   |  confidence-band precision     |   |  3x @ temperature=0,           |
+   |  (elements / correspondence /  |   |  check                         |   |  scored through the identical  |
+   |   deltas)                      |   |                                 |   |  score_pair path                |
+   +-------------------------------+   +-------------------------------+   +-------------------------------+
+                    \                              |                                    /
+                     \                             |                                   /
+                      v                            v                                  v
+                        +-----------------------------------------------------+
+                        |  run_eval.py                                          |
+                        +-----------------------------------------------------+
+                                                       |
+                                                       v
               +-----------------------------------------------------+
               |  scorecard:                                          |
               |   - delta P/R/F1 (overall / per kind / per format    |
-              |     level / primary-cascade-semantic_null)           |
+              |     level / primary-cascade)                         |
+              |   - confidence calibration (band -> precision)        |
+              |   - semantic-null flag detection P/R                 |
               |   - null-pair false-positive count per null kind     |
               |   - not_a_pair refusal check                         |
-              |   - chat correctness (LLM-judge, 5/5 validated vs    |
-              |     hand-checked) / groundedness / refusal accuracy  |
+              |   - chat correctness (LLM-judge) / groundedness /    |
+              |     refusal accuracy                                 |
               |   - llm_direct baseline variance (the measured       |
-              |     determinism argument)                            |
+              |     determinism argument)                             |
               +-----------------------------------------------------+
+
+   ============================================================================
+   tools/ + eval/baselines/  -- dev utilities, outside the request/response
+   pipeline above (not wired into run/chat/markup/eval)
+   ============================================================================
+   - compare_models.py    same pair, same credential, different model names,
+                           tokens/latency side by side
+   - backend_compare.py   multi-backend cost/latency comparison
+                           (scaffolded -- needs a 2nd credential to actually run)
+   - visual_diff.py       naive, independent greedy matcher + human-in-the-loop
+                           HTML debug viewer (deliberately not the real engine,
+                           a sanity check against it)
 
 --------------------------------------------------------------------------------
 Legend
@@ -179,3 +212,4 @@ Legend
   -->   data / control flow
   \-\-   declared-but-not-implemented path (L2 relations, L3 embeddings, DWG)
   [ ]    terminal outcome (refusal)
+  (opt-in)   off by default; enabled via an env flag, changes no default output

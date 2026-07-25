@@ -2,11 +2,13 @@
 
 Renders both PDF pages side by side and overlays color-coded boxes from a
 *naive* greedy content matcher (exact match, then rapidfuzz best-match,
-then leftovers are add/remove). This exists to eyeball what the native-PDF
-adapter extracted and how a simple matcher pairs it up -- useful right now,
-before README Plan step 3 (the real deterministic bipartite-matching delta
-engine) exists, and useful afterward too, to sanity-check the real engine's
-output against a quick independent baseline.
+then leftovers are add/remove) -- deliberately independent of src/delta/'s
+real deterministic bipartite matcher (register -> align -> classify), so
+it stays useful as an independent sanity check against that engine's
+output rather than just re-running the same logic through a viewer.
+Useful for eyeballing what an adapter actually extracted and how a
+simple, unrelated matcher pairs it up, without needing to trust the real
+engine's own matching to also be showing you the truth.
 
 Usage:
     python -m tools.visual_diff --a path/A.pdf --b path/B.pdf --out diff.html
@@ -45,8 +47,9 @@ def _record(el):
 
 def naive_match(elements_a, elements_b):
     """Greedy, per-type, exact-then-fuzzy matcher. NOT the real delta
-    engine's deterministic bipartite matching (README Plan step 3) --
-    a quick debug baseline, explicitly not claiming optimality."""
+    engine's deterministic bipartite matching (src/delta/align.py's
+    Hungarian-algorithm matcher) -- a quick, independent debug baseline,
+    explicitly not claiming optimality."""
     by_type_a, by_type_b = {}, {}
     for e in elements_a:
         by_type_a.setdefault(e.type, []).append(e)

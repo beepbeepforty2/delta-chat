@@ -30,20 +30,25 @@ flowchart TD
         MS --> ME["align.py\nmatch_elements\n(Hungarian bipartite match)"]
         ME --> CLS["classify.py\nadd / remove / modify / move\n+ cascade grouping"]
         CLS --> SEV["severity.py\nCRITICAL / HIGH / MEDIUM / LOW"]
+        SEV --> SN["semantic_null.py\nrule (DELETED-collapse, always on) +\nopt-in LLM adjudication (reword-equivalence)"]
+        SN --> RR["raster_recall.py (opt-in)\nconfidence-gated registered pixel diff\n→ unclassified_visual_change, low confidence"]
     end
 
     subgraph Output["Report + Markup"]
-        SEV --> RPT["report.py\ndelta_report.json / .md"]
-        SEV --> MKP["markup/overlay.py\nannotated raster PNGs\n(add/remove/modify/move, colored + legended)"]
+        RR --> RPT["report.py\ndelta_report.json / .md\nseverity-sorted"]
+        RR --> MKP["markup/pdf_annotate.py (default)\nreal PDF Square annotations\non the original PDFs"]
+        RR --> MKPNG["markup/overlay.py (--format png)\nraster PNG preview, legended"]
         CD --> MKP
+        CD --> MKPNG
     end
 
     subgraph Chat["src/chat/ — grounded Q&A"]
         CD --> CHK["retrieval.py\nbuild_chunks(A, B, deltas)"]
-        SEV --> CHK
-        CHK --> BM25["BM25Index\n(homegrown Okapi BM25,\ndelta-source boost, zone-aware)"]
+        RR --> CHK
+        DOM["config/domain.yaml\nquery-alias expansion\n(trip→sd/hh/ll, spec→pipe_class, …)"] -.additive.-> BM25
+        CHK --> BM25["BM25Index\n(homegrown Okapi,\ndelta-source boost 1.5×, zone-aware)"]
         BM25 --> ANS["chat.py: answer()"]
-        ANS --> LLMC["llm.py\nGLM via Anthropic-compatible API\n(base_url + auth_token)"]
+        ANS --> LLMC["llm.py: get_client()/MODEL\nGLM via Anthropic-compatible API\n(base_url + auth_token)"]
         LLMC --> CIT["citations.py\npost-validate ids;\nforced refusal if unsupported"]
         CIT --> OUT["ChatAnswer\n(text, citations, refused, reason)"]
     end
@@ -56,9 +61,16 @@ flowchart TD
     Chat -.instruments.-> TR
 
     subgraph Eval["eval/ — harness"]
-        GEN["eval/datasets/generator\nseeded pairs + 3-layer GT\n(elements / correspondence / deltas)"] --> RE["run_eval.py"]
+        GEN["eval/datasets/generator\nseeded pairs + 3-layer GT"] --> RE["run_eval.py"]
         RPT --> RE
         OUT --> RE
+        CAL["calibration.py\nconfidence-band precision check"] --> RE
         BASE["baselines/llm_direct.py\n3× @ temp=0, same score_pair path"] --> RE
-        RE --> SC["scorecard:\ndelta P/R/F1 (overall/kind/level/primary-cascade-null) ·\nnull-pair FP · not_a_pair refusal ·\nchat correctness (LLM-judge, 5/5 validated) /\ngroundedness / refusal accuracy ·\nllm_direct variance"]
+        RE --> SC["scorecard:\ndelta P/R/F1 (overall/kind/level/primary-cascade) ·\nconfidence calibration · semantic-null detection P/R ·\nnull-pair FP · not_a_pair refusal ·\nchat correctness (LLM-judge)/groundedness/refusal ·\nllm_direct variance"]
+    end
+
+    subgraph Tools["tools/ + eval/baselines/ — dev utilities, outside the request/response pipeline"]
+        CMP["compare_models.py\nsame pair, same credential,\ndifferent model names, usage side by side"]
+        BC["backend_compare.py\nmulti-backend cost/latency\n(scaffolded — needs a 2nd credential)"]
+        VD["visual_diff.py\nnaive independent matcher,\nhuman-in-the-loop debug viewer"]
     end

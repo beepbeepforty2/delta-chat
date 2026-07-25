@@ -135,7 +135,7 @@
   </nav>
 
   <div class="diagram-card">
-    <img src="architecture.svg" alt="delta-chat architecture diagram: ingest adapters feed a canonical document, which a deterministic delta engine (precheck, register, align, classify, severity) turns into a report and markup overlay, and which grounded chat retrieves over; a homegrown tracer instruments all three, and an eval harness scores the whole pipeline.">
+    <img src="architecture.svg" alt="delta-chat architecture diagram: ingest adapters feed a canonical document, which a deterministic delta engine (precheck, register, align, classify, severity, semantic-null detection, opt-in raster recall) turns into a report and two markup paths (real PDF annotations by default, a raster preview opt-in), and which grounded chat retrieves over with a domain-alias-expanded BM25 index; a homegrown tracer instruments ingest/delta/chat, and an eval harness scores the whole pipeline plus a suite of dev-only comparison tools.">
     <div class="diagram-caption">docs/architecture.svg — also available as .html (this page), .txt (ASCII), and .mmd (mermaid source)</div>
   </div>
 
@@ -146,7 +146,10 @@
       <li><span class="tag">DWG</span><code>DWGAdapter</code> is a real, documented stub (ODA/LibreDWG→DXF→ezdxf path) — not a working parser.</li>
       <li><span class="tag">register.py</span>Real Umeyama similarity-transform estimation from anchor correspondences, verified exact against synthetic ground truth — but this dataset's own scanned pairs apply identical (not independently-randomized) skew to both revisions, so it can't be empirically demonstrated against them.</li>
       <li><span class="tag">severity.py</span>Deterministic CRITICAL/HIGH/MEDIUM/LOW rule table, not LLM-judged — no eval ground truth exists for it, so it's spot-checked against known real deltas rather than scored through <code>eval/metrics.py</code>.</li>
-      <li><span class="tag">chat</span>Every LLM call is isolated to <code>llm.py</code>/<code>chat.py</code>: retrieval, citation parsing, and post-validation are all deterministic — an uncited or hallucinated-id answer is programmatically overridden into a refusal.</li>
+      <li><span class="tag">semantic_null.py</span>A precise rule (DELETED-placeholder collapse) always runs; a fuzzier reword-equivalence case is opt-in LLM adjudication only. The rule's first version had a real precision bug — caught by the live eval, not a unit test — see <code>docs/findings.md</code>.</li>
+      <li><span class="tag">raster_recall.py</span>Opt-in, confidence-gated, and honestly unvalidatable for precision on this synthetic dataset (no ground truth exists here for "genuinely missed visual content") — excluded from P/R/F1 scoring entirely, reported as a plain count instead.</li>
+      <li><span class="tag">markup</span><code>pdf_annotate.py</code> (real PDF annotation objects) is the default; the original <code>overlay.py</code> raster-PNG version is kept as a <code>--format png</code> opt-in preview, not removed.</li>
+      <li><span class="tag">chat</span>Every LLM call is isolated to <code>llm.py</code>/<code>chat.py</code>: retrieval, citation parsing, and post-validation are all deterministic — an uncited or hallucinated-id answer is programmatically overridden into a refusal. The LLM-judge is a structurally separate backend seam (<code>get_judge_client()</code>) but shares credentials with chat until a second one is configured — the scorecard prints this caveat live next to the correctness number.</li>
     </ul>
   </section>
 
