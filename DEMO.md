@@ -10,6 +10,10 @@ pair, not synthetic generator output: a crop of genuine vendor P&ID content
 tools. Full provenance and the exact list of edits made:
 [`data/samples/real_pair/PROVENANCE.md`](data/samples/real_pair/PROVENANCE.md).
 
+> Recording a video walkthrough of this? [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+> is the shot list — measured timings, an asciinema path, and a ready-to-paste
+> prompt for a computer-use agent to run it unattended.
+
 **Fastest way to reproduce section 1 yourself**, with nothing installed but
 Docker — no Python, no `uv`, no `tesseract`, no credential, no mounts:
 
