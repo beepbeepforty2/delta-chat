@@ -59,13 +59,19 @@ def _ocr_words(img: Image.Image) -> list[dict]:
     words = []
     for i in range(len(data["text"])):
         text = data["text"][i].strip()
-        # tesseract returns conf as a string (e.g. "95" or "-1" for no
-        # confidence); some versions also emit "" for non-text entries, which
-        # int() would reject with ValueError. Coerce defensively and skip the
-        # word on any non-numeric value rather than aborting OCR of the page.
+        # tesseract reports conf inconsistently across versions/bindings: an
+        # int (what pytesseract returns here today), the string "95", the
+        # string "95.0", "-1" for "no confidence", or "" for a non-text entry.
+        # Parse through float() so every numeric spelling is accepted --
+        # int("95.0") raises ValueError, and since the except branch SKIPS the
+        # word, a build that formats conf with a decimal point would drop
+        # every word on the page and return an empty OCR result with nothing
+        # raised. Silent total data loss is a worse failure than the bare
+        # int() crash this guard replaced, so the guard must only swallow
+        # genuinely non-numeric values ("" and None), never numeric ones.
         raw_conf = data["conf"][i]
         try:
-            conf = int(raw_conf)
+            conf = int(float(raw_conf))
         except (TypeError, ValueError):
             continue
         if not text or conf < MIN_OCR_CONF:

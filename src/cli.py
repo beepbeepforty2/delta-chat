@@ -59,7 +59,14 @@ def _run_pipeline(args: argparse.Namespace, tracer: Tracer,
     diagnostic), cmd_chat/cmd_markup do not (the interactive/quick paths keep
     refusal output to one line). Centralizing the rest avoids the three-way
     duplication that previously meant a change to the ingest/precheck spans
-    had to be made in three places and could silently diverge."""
+    had to be made in three places and could silently diverge.
+
+    Note this deliberately UNIFIES one behavior that used to differ: the
+    weak-identity WARNING below was previously printed by cmd_run only, so
+    cmd_chat and cmd_markup would diff a pair of unconfirmed identity in
+    silence. All three now warn -- the caveat matters at least as much when
+    the output is an answer you might trust or a marked-up PDF you might
+    circulate as when it is a report."""
     with tracer.span("ingest"):
         with tracer.span("ingest_a", path=args.a) as s:
             doc_a = _resolve_with_pid("A", args.a)
@@ -79,7 +86,12 @@ def _run_pipeline(args: argparse.Namespace, tracer: Tracer,
             print(f"  A: drawno={precheck.drawing_no_a!r} equipment={precheck.equipment_a!r}", file=sys.stderr)
             print(f"  B: drawno={precheck.drawing_no_b!r} equipment={precheck.equipment_b!r}", file=sys.stderr)
         return 1
-    if "no drawing number" in precheck.reason:
+    # Branch on the structured tier, never on `reason` text. A substring check
+    # ("no drawing number" in reason) used to gate this and silently stopped
+    # firing for the tag-overlap tier once that tier's message was worded
+    # differently -- so the WEAKEST accepted identity signal was the one case
+    # that produced no warning at all.
+    if precheck.identity_tier in ("tag_overlap", "none"):
         print(f"WARNING: {precheck.reason}", file=sys.stderr)
 
     deltas = compute_deltas(doc_a, doc_b, tracer)

@@ -113,17 +113,57 @@ def _doc_with_drawno(pid, drawno_value):
                              sheets=[CanonicalSheet(number=1, width=1.0, height=1.0, elements=els)])
 
 
-def test_empty_string_drawno_on_both_sides_matches_as_pair():
-    """Regression: the old ``if drawno_a and drawno_b`` truthiness check treated
-    an empty-string drawno (a real extraction artifact from a malformed title
-    block) as 'absent', silently downgrading to a weaker tier. With ``is not
-    None``, two empty-string drawno values match as equal and the pair is
-    accepted at the drawno tier itself."""
+def test_empty_string_drawno_on_both_sides_falls_through_not_matches():
+    """Two equally-unextractable title blocks are the ABSENCE of an identity
+    signal, not a signal that happens to be equal. Accepting them as "drawing
+    numbers match" would confirm identity at the strongest tier on the
+    strength of two empty strings, and skip the equipment-tag and tag-overlap
+    tiers that could still say something real -- inverting the fail-safe this
+    module exists to provide.
+
+    So: `is not None` still distinguishes absent from present (that part of
+    the truthiness fix was right), but equality alone no longer confirms a
+    match -- the value must be non-empty. Both-empty falls through, and here
+    the weaker tag-overlap tier correctly resolves it."""
     doc_a = _doc_with_drawno("a", "")
     doc_b = _doc_with_drawno("b", "")
     result = check_same_document(doc_a, doc_b)
-    assert result.is_pair is True
-    assert result.reason == "drawing numbers match"
+    assert result.identity_tier == "tag_overlap"
+    assert result.reason != "drawing numbers match"
+
+
+def test_empty_string_equipment_tag_also_falls_through():
+    """Same rule one tier down: an empty equipment tag on both sides must not
+    be accepted as 'equipment tags match'."""
+    def _doc_with_equip(pid, value):
+        el = CanonicalElement(
+            id="eq", type="equipment_tag", content=value, bbox=BBox(0.1, 0.1, 0.2, 0.11),
+            sheet=1, zone="A-1", extraction_confidence=1.0,
+        )
+        return CanonicalDocument(pid=pid, source_format="pdf_native", revision_label=None,
+                                 sheets=[CanonicalSheet(number=1, width=1.0, height=1.0,
+                                                        elements=[el, _tag_el("e0", "26-L-1001")])])
+
+    result = check_same_document(_doc_with_equip("a", ""), _doc_with_equip("b", ""))
+    assert result.reason != "equipment tags match"
+
+
+def test_identity_tier_is_set_for_each_decision_path():
+    """cli.py branches on identity_tier to decide whether to warn, so every
+    return path must label itself. A substring check on `reason` used to gate
+    that warning and silently stopped firing when a message was reworded."""
+    strong_a = _doc_with_drawno("a", "0D204-PID-26-902-001")
+    strong_b = _doc_with_drawno("b", "0D204-PID-26-902-001")
+    assert check_same_document(strong_a, strong_b).identity_tier == "drawno"
+
+    # no title-block signal at all, but tags overlap heavily
+    overlap = check_same_document(_doc("a", ["26-L-1001", "26-L-1002"]),
+                                  _doc("b", ["26-L-1001", "26-L-1002"]))
+    assert overlap.identity_tier == "tag_overlap"
+
+    # nothing comparable on one side -> the blind fail-open path
+    blind = check_same_document(_doc("a", ["26-L-1001"]), _doc("b", []))
+    assert blind.identity_tier == "none"
 
 
 def test_empty_string_drawno_on_one_side_real_on_other_is_refused():

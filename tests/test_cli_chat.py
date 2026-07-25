@@ -84,8 +84,7 @@ def test_chat_uncited_llm_answer_is_forced_to_refusal(tmp_path, monkeypatch, cap
 
     monkeypatch.setenv("TRACE_DIR", str(tmp_path / "traces"))
     monkeypatch.setattr(tracer_mod, "TRACE_DIR", str(tmp_path / "traces"))
-    monkeypatch.setattr(chat_mod, "_default_call_llm",
-                        _fake_llm_factory(captured := []))
+    monkeypatch.setattr(chat_mod, "_default_call_llm", _fake_llm_factory([]))
 
     args = _Args(str(pair_dir / "a" / "L0.pdf"), str(pair_dir / "b" / "L0.pdf"),
                  question=["summarize everything"])
@@ -116,3 +115,49 @@ def test_chat_refuses_not_a_pair_without_calling_llm(tmp_path, monkeypatch, caps
     rc = cmd_chat(args)
     assert rc == 1
     assert "REFUSED" in capsys.readouterr().err
+
+
+def test_chat_warns_when_identity_is_only_weakly_confirmed(tmp_path, monkeypatch, capsys):
+    """The weak-identity WARNING must reach cmd_chat, not just cmd_run.
+
+    Two points this pins down:
+
+    1. Before the pipeline was centralized, only cmd_run printed this. A chat
+       session over a pair whose identity was never confirmed produced answers
+       with no hint of that caveat -- arguably the worst place to omit it,
+       since the output is prose a reader may simply trust.
+    2. The warning is gated on precheck.identity_tier, NOT on substrings of
+       precheck.reason. A substring check ("no drawing number" in reason) used
+       to gate it and silently stopped firing for the tag_overlap tier once
+       that tier's message was worded differently -- so the weakest accepted
+       signal became the one case that warned about nothing.
+    """
+    pair_dir = PAIRS_DIR / "edited_002"
+    if not pair_dir.exists():
+        pytest.skip("run `make dataset` first")
+
+    monkeypatch.setenv("TRACE_DIR", str(tmp_path / "traces"))
+    monkeypatch.setattr(tracer_mod, "TRACE_DIR", str(tmp_path / "traces"))
+    monkeypatch.setattr(chat_mod, "_default_call_llm", _fake_llm_factory([]))
+
+    # Force the weakest accepting tier without needing a fixture whose title
+    # block fails to extract: report tag_overlap from precheck as cli sees it.
+    import src.cli as cli_mod
+    from src.delta.precheck import check_same_document as real_check
+
+    def weak_identity(doc_a, doc_b):
+        r = real_check(doc_a, doc_b)
+        r.identity_tier = "tag_overlap"
+        r.reason = "no title-block identity signal extracted; tag-content overlap 91% indicates same document"
+        return r
+
+    monkeypatch.setattr(cli_mod, "check_same_document", weak_identity)
+
+    args = _Args(str(pair_dir / "a" / "L0.pdf"), str(pair_dir / "b" / "L0.pdf"),
+                 question=["what changed?"])
+    rc = cmd_chat(args)
+
+    assert rc == 0, "a weakly-confirmed pair should still be diffed, only warned about"
+    err = capsys.readouterr().err
+    assert "WARNING" in err
+    assert "tag-content overlap" in err

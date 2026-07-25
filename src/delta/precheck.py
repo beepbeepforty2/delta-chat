@@ -28,13 +28,19 @@ from __future__ import annotations
 import os
 from collections import Counter
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional
 
 from src.canonical.model import CanonicalDocument
 
 TAG_OVERLAP_MIN = float(os.environ.get("PRECHECK_TAG_OVERLAP_MIN", "0.3"))
 
 _TAG_TYPES = {"line_tag", "valve_tag", "nozzle", "equipment_tag", "instrument"}
+
+# Which signal actually decided the result, strongest to weakest. Callers that
+# need to treat a weak acceptance differently (src/cli.py warns on one) must
+# branch on this, NOT on substrings of `reason` -- `reason` is a human-readable
+# message and rewording it silently broke exactly such a check once already.
+IdentityTier = Literal["drawno", "equipment", "tag_overlap", "none"]
 
 
 @dataclass
@@ -45,6 +51,9 @@ class PrecheckResult:
     drawing_no_b: Optional[str]
     equipment_a: Optional[str]
     equipment_b: Optional[str]
+    # Defaulted so the six positional call sites below (and any test that
+    # constructs one) keep working unchanged.
+    identity_tier: IdentityTier = "none"
 
 
 def _find_drawno(doc: CanonicalDocument) -> Optional[str]:
@@ -83,28 +92,38 @@ def check_same_document(doc_a: CanonicalDocument, doc_b: CanonicalDocument) -> P
     drawno_a, drawno_b = _find_drawno(doc_a), _find_drawno(doc_b)
     equip_a, equip_b = _find_equipment_tag(doc_a), _find_equipment_tag(doc_b)
 
+    # An EMPTY extracted value is the absence of an identity signal, not a
+    # signal that happens to be equal on both sides: two documents whose title
+    # blocks both failed to extract must not match at the strongest tier and
+    # skip the weaker ones. `is not None` correctly distinguishes "absent" from
+    # "present", but presence alone can't decide a match -- hence the explicit
+    # non-empty guard on the equality branch, with both-empty falling through.
     if drawno_a is not None and drawno_b is not None:
-        if drawno_a == drawno_b:
-            return PrecheckResult(True, "drawing numbers match", drawno_a, drawno_b, equip_a, equip_b)
-        return PrecheckResult(False, f"drawing numbers differ: {drawno_a!r} vs {drawno_b!r}",
-                               drawno_a, drawno_b, equip_a, equip_b)
+        if drawno_a != drawno_b:
+            return PrecheckResult(False, f"drawing numbers differ: {drawno_a!r} vs {drawno_b!r}",
+                                   drawno_a, drawno_b, equip_a, equip_b, "drawno")
+        if drawno_a != "":
+            return PrecheckResult(True, "drawing numbers match",
+                                   drawno_a, drawno_b, equip_a, equip_b, "drawno")
 
     if equip_a is not None and equip_b is not None:
-        if equip_a == equip_b:
-            return PrecheckResult(True, "equipment tags match", drawno_a, drawno_b, equip_a, equip_b)
-        return PrecheckResult(False, f"equipment tags differ: {equip_a!r} vs {equip_b!r}",
-                               drawno_a, drawno_b, equip_a, equip_b)
+        if equip_a != equip_b:
+            return PrecheckResult(False, f"equipment tags differ: {equip_a!r} vs {equip_b!r}",
+                                   drawno_a, drawno_b, equip_a, equip_b, "equipment")
+        if equip_a != "":
+            return PrecheckResult(True, "equipment tags match",
+                                   drawno_a, drawno_b, equip_a, equip_b, "equipment")
 
     overlap = _tag_content_overlap(doc_a, doc_b)
     if overlap is not None:
         if overlap >= TAG_OVERLAP_MIN:
             return PrecheckResult(True, f"no title-block identity signal extracted; "
                                          f"tag-content overlap {overlap:.0%} indicates same document",
-                                   drawno_a, drawno_b, equip_a, equip_b)
+                                   drawno_a, drawno_b, equip_a, equip_b, "tag_overlap")
         return PrecheckResult(False, f"no title-block identity signal extracted; "
                                       f"tag-content overlap only {overlap:.0%}, likely different documents",
-                               drawno_a, drawno_b, equip_a, equip_b)
+                               drawno_a, drawno_b, equip_a, equip_b, "tag_overlap")
 
     return PrecheckResult(True, "no drawing number, equipment tag, or comparable tag content "
                                  "extracted on either document; proceeding without identity confirmation",
-                           drawno_a, drawno_b, equip_a, equip_b)
+                           drawno_a, drawno_b, equip_a, equip_b, "none")

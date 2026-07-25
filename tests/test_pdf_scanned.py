@@ -141,3 +141,33 @@ def test_ocr_words_skips_non_numeric_confidence(monkeypatch):
     assert "good" in texts
     assert "also" in texts
     assert len(words) == 2
+
+
+def test_ocr_words_accepts_float_formatted_confidence(monkeypatch):
+    """The non-numeric guard above must not swallow *numeric* confidences.
+
+    tesseract/pytesseract builds vary in how they spell conf: an int, "95",
+    or "95.0". The guard SKIPS the word on a parse failure, and int("95.0")
+    raises ValueError -- so parsing with a bare int() would drop every word
+    on a decimal-formatting build, returning an empty OCR result with nothing
+    raised. That silent total data loss is a worse failure than the crash the
+    guard was added to prevent, which is why parsing goes through float()."""
+    from PIL import Image
+
+    fake_data = {
+        "text": ["alpha", "beta", "gamma"],
+        "conf": ["95.0", 88, "70.5"],   # float-string, real int, fractional
+        "left": [10, 20, 30],
+        "top": [10, 20, 30],
+        "width": [20, 20, 20],
+        "height": [10, 10, 10],
+    }
+    monkeypatch.setattr(pdf_scanned_mod.pytesseract, "image_to_data",
+                        lambda img, output_type=None: fake_data)
+
+    words = _ocr_words(Image.new("RGB", (100, 100)))
+
+    assert [w["text"] for w in words] == ["alpha", "beta", "gamma"], (
+        "a float-formatted confidence must be parsed, not silently dropped"
+    )
+    assert [w["conf"] for w in words] == [95, 88, 70]  # truncated toward zero

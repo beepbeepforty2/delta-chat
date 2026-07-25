@@ -13,13 +13,11 @@ import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "eval" / "datasets"))
 
-import fitz
 import pytest
 
 from generator.content import make_sheet
 from generator.render import render_pdf, degrade
 from src.ingest import pdf_native as pdf_native_mod
-from src.ingest import pdf_scanned as pdf_scanned_mod
 from src.markup import overlay as overlay_mod
 
 
@@ -188,7 +186,7 @@ def test_overlay_annotate_does_not_hold_file_open(tmp_path):
     soon as the convert() copy is made. Assert the raster file can be removed
     immediately after _annotate returns (it could not be while the handle was
     held on Windows / some platforms)."""
-    from PIL import Image, ImageDraw
+    from PIL import Image
 
     raster = tmp_path / "sheet.png"
     Image.new("RGB", (40, 40), (255, 255, 255)).save(str(raster))
