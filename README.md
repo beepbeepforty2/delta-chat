@@ -45,12 +45,183 @@ eval harness threaded through all of it:
    to an id that was never retrieved, gets the answer overridden into a
    refusal before it's returned.
 
+**If you're reviewing this, start with [Reviewer's guide: one real pair,
+stage by stage](#reviewers-guide-one-real-pair-stage-by-stage) below** —
+it walks the same pipeline as concrete data from a real traced run,
+showing the actual structure at each stage and how it changes. It's a
+faster way in than the abstract list above.
+
 See [`docs/architecture.svg`](docs/architecture.svg) /
 [`docs/architecture.html`](docs/architecture.html) for a diagram of the
 full pipeline, and [`docs/findings.md`](docs/findings.md) for a detailed,
 honest account of real bugs found while building each piece — almost all
 caught by actually running the pipeline against real data, not by
 inspection or unit tests alone.
+
+## Reviewer's guide: one real pair, stage by stage
+
+The list above is the design. This is what actually happened to one real
+pair — `eval/datasets/v0/pairs/edited_000` at L0 (native), 1338ms end to
+end, taken from a real observability trace and re-run to capture the
+payloads the trace only counts. Every number below is reproducible
+(`make dataset` is seeded; traces land in `traces/{correlation_id}.json`,
+gitignored but written on every run).
+
+**The shape of the whole thing:** two independent lists (133, 134
+elements) → one paired list (134) → typed deltas (8) → annotated in place
+(8) → plus an independent pixel list (11) → filtered and re-typed into the
+same shape (4) → **12 deltas**. Every narrowing is a deliberate
+subtraction, and each stage's evidence survives into the next rather than
+being recomputed.
+
+### 0 — IR (`CanonicalDocument`)
+
+```
+doc_a: pid=A  fmt=pdf_native  rev=A  sheets=1  rasters=[1]
+n_elements  A=133  B=134
+by type: zone_label 44, geometry 20, line_tag 15, note 13, valve_tag 9,
+         instrument 9, nozzle 7, datasheet_row 5, title_field 5, ...
+```
+
+One element, in full:
+
+```
+id      = el_77e42cf8453a
+type    = instrument
+content = 'PIT 9056 26 SD HH:245 LL:110'
+bbox    = BBox(0.5709, 0.2187, 0.6128, 0.2245)   # normalized, y-down
+sheet=1  zone=C-7  extraction_confidence=1.0
+attrs   = {'func':'PIT','loop':9056,'system':'26',
+           'setpoints':{'HH':245,'LL':110},
+           'type_confidence':1.0,'classification_rule':'regex:instrument'}
+```
+
+Two flat lists. Nothing relates A to B yet. Note `attrs` is already
+*parsed* — downstream stages diff structured fields, never raw text.
+
+### 1 — precheck → `PrecheckResult` *(0.06ms)*
+
+```
+is_pair      = True
+reason       = 'drawing numbers match'
+drawing_no_a = '0D204-PID-26-902-001'   drawing_no_b = '0D204-PID-26-902-001'
+equipment_a  = '26-KA-902'              equipment_b  = '26-KA-902'
+```
+
+Tier 1 hit. A gate, not a transform — nothing changes shape.
+
+### 2 — register → `Transform` *(0.2ms)*
+
+```
+Transform(scale=1.0000000000000002, rotation=1.8e-17, tx=-5.5e-16, ty=-4.4e-16)
+```
+
+Same producer here, so an identity to float noise. One object, carried
+forward and applied lazily — the element lists are never rewritten.
+
+### 3 — align → `list[MatchedPair]` *(2.3ms)*
+
+`match_sheets` → `[(1, 1)]`, then per sheet **133 + 134 elements → 134 pairs**:
+
+```
+both=133   only_a=0   only_b=1
+```
+
+A matched pair, carrying its own evidence:
+
+```
+MatchedPair(
+  a.id='el_18a1d3f05d47'  '16. THIS P&ID CONTAINS DCN-KP-0273-1.'
+  b.id='el_ee4f2d530b81'  '16. THIS P&ID CONTAINS DCN-KP-0273-1/1002-'
+  cost=0.0539  margin=0.3393  near_miss_cost=None)
+```
+
+The one single-sided pair:
+
+```
+MatchedPair(a=None, b='el_b1e48be41cfc', type=rev_row,
+            'B 2026-06-30 REVISED AS PER DCN',
+            near_miss_cost=0.2493)
+```
+
+Two lists became **one list of pairs**. `cost` / `margin` /
+`near_miss_cost` are the matcher's evidence — everything downstream reads
+them instead of re-deriving them.
+
+### 4 — classify → `list[Delta]` *(0.15ms)*
+
+**134 pairs → 8 deltas.** The 126 unchanged pairs emit *nothing* — that
+collapse is the point of the stage.
+
+```
+by_kind = {modify: 2, move: 5, add: 1}      by_severity = {low: 8}
+
+[delta0001] modify  dcn_note     conf=0.3393  C-1→C-1
+   fields={'content': ['16. …DCN-KP-0273-1.', '16. …DCN-KP-0273-1/1002-1.']}
+[delta0005] add     rev_row      conf=0.0     None→J-10
+   fields={}                          ← near_miss_cost=0.2493 ⇒ conf 0.0, not 1.0
+[delta0006] modify  title_field  conf=0.3434  J-10→J-10
+   fields={'value': ['A', 'B']}       ← the revision bump
+[delta0007] move    valve_tag    conf=0.3132  B-7→C-6   '43GT9067'
+[delta0008] move    valve_tag    conf=0.3711  C-5→C-5   '26CB9038'
+```
+
+Pairs became **typed, field-level records**. `delta0001` is a field diff
+(`content`), not a string comparison. `delta0005` is where the
+`near_miss_cost` guard shows up in real data: a plausible candidate was
+rejected, so it reports `0.0` — before that fix it read `1.0`.
+
+### 5 — semantic_null *(0.009ms)*
+
+```
+n_flagged = 0   (llm_enabled=False — rule half only)
+```
+
+**Annotates in place.** Same 8 objects, `.semantic_null` set. No
+reshaping. This is the one stage that can call an LLM, and only when
+`DELTA_SEMANTIC_NULL_LLM=1`.
+
+### 6 — raster_diff → `list[ChangeRegion]` *(947ms — 71% of total)*
+
+Pixels only. Has never heard of stages 0–5.
+
+```
+n_regions = 11
+  area_px=2628  mag=0.631  bbox=(0.5005, 0.1847, 0.5112, 0.2001)
+  area_px=1612  mag=0.552  bbox=(0.5140, 0.1904, 0.5279, 0.1973)
+  …
+  area_px=6976  mag=0.621  bbox=(0.7608, 0.9056, 0.8160, 0.9131)   ← title block
+  area_px=556   mag=0.322  bbox=(0.7679, 0.9510, 0.7725, 0.9581)
+```
+
+A **parallel, independent list** — no ids, no types, just *where* and
+*how much*. This is the "raster localizes" half.
+
+### 7 — raster_join → residue `list[Delta]` *(0.23ms)*
+
+```
+11 regions in → 4 residue deltas out   (7 suppressed)
+```
+
+The 7 dropped are regions stage 4 already explained (the valve moves, the
+rev bump), or that identical text on both sides confirms unchanged.
+Survivors are re-typed into the *same* `Delta` shape everything else uses:
+
+```
+[raster0001] unclassified_visual_change  kind=extraction_gap  conf=0.4137  B-7
+             fields={'candidate_element_ids': ['el_e6542fe5bac1']}
+[raster0004] unclassified_visual_change  kind=graphical       conf=0.3254  C-5
+             fields={'tags': ['40GT9248']}
+```
+
+Confidences are all ≤ 0.45 by cap — this stage locates, it never
+outranks a symbolic finding. That's the "symbolic classifies" half.
+
+### Final
+
+```
+8 symbolic + 4 raster residue = 12 deltas → report / markup / chat
+```
 
 ## Quick start
 
