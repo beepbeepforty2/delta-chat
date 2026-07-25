@@ -4,6 +4,10 @@ Given two PIDs (two revisions of a document: native PDF, scanned PDF, or DWG),
 compute a structured delta, emit a human+machine readable delta report, and
 chat over both revisions and the report with citations.
 
+**License:** shared publicly for hiring-assessment evaluation only — see
+[LICENSE](LICENSE). No rights are granted to use this code beyond
+evaluation without prior written permission.
+
 ## Status
 
 Repo scaffold, canonical-representation seam, a **seeded, validated dataset
