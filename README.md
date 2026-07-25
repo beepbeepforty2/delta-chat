@@ -63,6 +63,13 @@ If the two files aren't actually revisions of the same drawing (different
 drawing number/equipment tag), `run`/`chat`/`markup` refuse rather than
 emit a bogus diff.
 
+Dependencies and the virtualenv are managed by
+[uv](https://docs.astral.sh/uv/) (`make install` runs `uv sync --extra dev`;
+`uv.lock` pins exact versions for a reproducible install) — install uv
+itself first if you don't have it: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+(macOS/Linux) or see uv's docs for other platforms. Every Makefile target
+runs through `uv run`, so there's never a venv to manually activate.
+
 The scanned-PDF adapter needs the `tesseract` binary on `PATH` (a system
 dependency, not pip-installable): `brew install tesseract` on macOS,
 `apt install tesseract-ocr` on Debian/Ubuntu.
@@ -82,19 +89,24 @@ live one).
 ```bash
 # full scorecard incl. chat + llm_direct baseline -- needs a credential,
 # passed at run time, never baked into the image
-docker run --rm --env-file .env delta-chat python -m eval.run_eval --dataset eval/datasets/v0
+docker run --rm --env-file .env delta-chat \
+  uv run python -m eval.run_eval --dataset eval/datasets/v0
 
 # run against your own two PDFs
 docker run --rm -v "$(pwd)/mypdfs:/data" delta-chat \
-  python -m src.cli run --a /data/revA.pdf --b /data/revB.pdf --out /data/reports
+  uv run python -m src.cli run --a /data/revA.pdf --b /data/revB.pdf --out /data/reports
 ```
 
 `ENTRYPOINT` is left unset — any command after the image name replaces
-the default (`make test`, a bare `bash`, etc.), the same as it would
-outside the container. (Caveat: this `Dockerfile` was written carefully
-against the project's real dependencies but hasn't been verified with an
-actual `docker build` — Docker wasn't available in the environment this
-was developed in.)
+the default. Commands that need the project's dependencies must go
+through `uv run` (`uv run python ...`, `make test`, a bare `bash` are all
+fine — `make`'s own targets already call `uv run` internally); a bare
+`python -m ...` without `uv run` would hit the base image's system
+Python, which has none of the project's dependencies installed, since
+those live in the `uv`-managed `.venv`. (Caveat: this `Dockerfile` was
+written carefully against the project's real dependencies but hasn't been
+verified with an actual `docker build` — Docker wasn't available in the
+environment this was developed in.)
 
 ## Eval scorecard (current)
 

@@ -10,16 +10,24 @@
 FROM python:3.11-slim
 
 # tesseract-ocr is a system binary pytesseract wraps (not pip-installable),
-# needed by src/ingest/pdf_scanned.py for the scanned-PDF adapter. Nothing
-# else here needs a system package -- PyMuPDF/numpy/scipy all ship
-# self-contained manylinux wheels for this base image's platform.
+# needed by src/ingest/pdf_scanned.py for the scanned-PDF adapter. `make` is
+# not in python:3.11-slim by default (Debian slim strips build tooling) but
+# every Makefile target is used below. Nothing else here needs a system
+# package -- PyMuPDF/numpy/scipy all ship self-contained manylinux wheels
+# for this base image's platform.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       tesseract-ocr \
+      make \
     && rm -rf /var/lib/apt/lists/*
+
+# uv, copied as a static binary from Astral's own minimal image -- not a
+# network install script run inside this Dockerfile. Faster, reproducible
+# dependency resolution than pip, using the committed uv.lock.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 WORKDIR /app
 COPY . .
-RUN pip install --no-cache-dir -e ".[dev]"
+RUN uv sync --extra dev --frozen
 
 RUN make dataset && make test
 
@@ -33,5 +41,6 @@ USER appuser
 # llm_direct sections need a live LLM credential (src/chat/llm.py raises
 # without one), so they're off by default here rather than crashing the
 # container on first run; see README's Docker section for how to enable
-# them via --env-file.
-CMD ["python", "-m", "eval.run_eval", "--dataset", "eval/datasets/v0", "--skip-chat", "--skip-baseline"]
+# them via --env-file. `uv run` picks up the venv uv sync already built,
+# no activation needed.
+CMD ["uv", "run", "python", "-m", "eval.run_eval", "--dataset", "eval/datasets/v0", "--skip-chat", "--skip-baseline"]
