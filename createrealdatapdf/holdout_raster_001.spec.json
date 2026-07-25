@@ -1,0 +1,36 @@
+{
+  "provenance": {
+    "source_name": "EPA-600/8-80-028, Figure 15 -- example P&ID for cryogenic oxygen generation",
+    "license": "US EPA work / public domain (per the figure's own source caption)",
+    "retrieved_via": "PDHonline course 462 'Piping and Instrumentation Diagrams' (Mark Ludwigson, 2021), page 21 of 42 -- used only as the retrieval vehicle; the course's own copyright header, page number and caption sit entirely at x <= 129.9pt and are excluded by the crop below, so no part of the copyrighted course layout is redistributed here",
+    "retrieved": "2026-07-25",
+    "page_used": 0,
+    "crop_rect_pt": [136.37, 186.71, 502.33, 720.42],
+    "crop_rationale": "the embedded image's own placement rect (page.get_image_rects); cropping to it removes all four course-chrome text elements and leaves only the EPA figure",
+    "base_is_raster": true,
+    "base_image_px": [1190, 816],
+    "notes": "Base document real; revision B edits authored here. The drawing is a single raster image with NO vector text and no OCR-recoverable tags at any DPI (150/300/600 all yield <35 mostly-garbage tokens), so this pair deliberately tests ONLY the graphical/raster path. It cannot exercise the symbolic engine -- see docs/findings.md."
+  },
+  "edits": [
+    {
+      "op": "swap_symbol",
+      "rect": [55.0, 169.5, 67.5, 178.0],
+      "glyph": "globe",
+      "from_glyph": "gate",
+      "orient": "h",
+      "role": "valve_tag",
+      "severity": "HIGH",
+      "desc": "valve 5 on the LOX line: gate -> globe at a constant tag (graphical only; no text changes)"
+    },
+    {
+      "op": "swap_symbol",
+      "rect": [133.5, 292.0, 145.0, 300.5],
+      "glyph": "globe",
+      "from_glyph": "gate",
+      "orient": "h",
+      "role": "valve_tag",
+      "severity": "HIGH",
+      "desc": "valve 2 upstream of the turbine: gate -> globe at a constant tag (graphical only; no text changes)"
+    }
+  ]
+}

@@ -448,11 +448,26 @@ def main() -> int:
     results_dir = Path(args.results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    prior_files = sorted(results_dir.glob("*.json"))
-    prior = json.loads(prior_files[-1].read_text()) if prior_files else None
+    # "vs previous run" must only ever compare like with like. Results from
+    # every dataset land in one directory, so without this filter a holdout
+    # run diffs against the seeded set (and, worse, the NEXT seeded run diffs
+    # against the holdout -- silently destroying the regression signal on the
+    # main scorecard). Files written before `dataset` was recorded predate any
+    # dataset but v0, so they're attributed to it.
+    dataset_key = str(dataset_dir).rstrip("/")
+    prior = None
+    for path in sorted(results_dir.glob("*.json"), reverse=True):
+        try:
+            candidate = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        if candidate.get("dataset", "eval/datasets/v0") == dataset_key:
+            prior = candidate
+            break
 
     t0 = time.time()
     results = run_eval(dataset_dir, levels, skip_chat=args.skip_chat, skip_baseline=args.skip_baseline)
+    results["dataset"] = dataset_key
     results["elapsed_s"] = round(time.time() - t0, 2)
 
     print_scorecard(results, diff=prior)

@@ -1,0 +1,2 @@
+{"pair_id": "holdout_null_001", "kind": "null_prod", "ops": [], "n_deltas": 0, "n_primary": 0, "n_cascade": 0, "n_semantic_null": 0, "held_out": true, "source": "real base document, re-saved (no edits)"}
+{"pair_id": "holdout_raster_001", "kind": "edited", "ops": ["ChangeValveSymbol"], "n_deltas": 2, "n_primary": 2, "n_cascade": 0, "n_semantic_null": 0, "held_out": true, "source": "real base document; edits authored here"}

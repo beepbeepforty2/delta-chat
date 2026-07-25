@@ -11,6 +11,15 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# Base PDFs for the held-out set are NOT redistributable: the source page
+# carries a third-party course copyright. Only the CROPPED derivative is
+# committed (eval/datasets/holdout/), containing solely the EPA public-domain
+# figure -- see that pair's gt/provenance.json for the full chain.
+# eval/datasets/holdout/ is deliberately NOT ignored: a holdout has to be
+# committed to serve as a fixed reference.
+createrealdatapdf/*.pdf
+.zcode/
+
 # generated / regenerable (see Makefile: make dataset, make run, make eval)
 eval/datasets/v0/
 eval/results/

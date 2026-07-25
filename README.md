@@ -429,6 +429,44 @@ that fabricated a whole-page false diff on a blank page, and a
 cross-shape matching bug in `align.py` exposed only once real content
 raised geometry density), is in [`docs/findings.md`](docs/findings.md).
 
+### Held-out real-P&ID set (`make eval-holdout`)
+
+A **gold-standard outsider test**, reported separately and never pooled with
+the seeded numbers above. The base is a real EPA P&ID (EPA-600/8-80-028,
+Figure 15 — cryogenic oxygen generation, public domain); only the edits are
+ours. No test asserts anything about detection on it — `tests/test_holdout_integrity.py`
+checks only that the fixture is well-formed and still *scoreable*, because a
+holdout that gates development stops being held out.
+
+| Check | Seeded set (`v0`) | **Held-out (real)** |
+|---|---|---|
+| Raster recall lift (raster on vs off) | 0.0 | **1.0** |
+| Residue precision | n/a (no hits) | **1.0** |
+| Null pair — hard false positives | 0 | **0** |
+| Null pair — raster regions emitted | **61** | **0** |
+
+**The headline finding is the reversal.** On the seeded set the raster recall
+net has always measured a `0.0` lift — the number that made it look like dead
+weight. On real content it catches **both** valve-symbol swaps that the
+symbolic engine structurally cannot see, at `1.0` residue precision. The
+synthetic set was *understating* the feature, for a reason now understood: its
+valve glyphs happen to be independently visible to the symbolic geometry
+pipeline, which suppresses the raster hit at the same spot.
+
+The null control reverses too, in the opposite direction: the synthetic
+`null_prod` pair emits **61** residue regions (a full font substitution changes
+every glyph), while a real producer re-save emits **0**. The synthetic pair was
+*overstating* the false-positive rate.
+
+Both numbers moved the moment real data was used — which is exactly what a
+holdout is for, and why the seeded figures should not be read as the system's
+true behavior on real drawings.
+
+**Honest limitation:** this base is a raster scan with no OCR-recoverable text
+at any DPI, so it exercises only the graphical path. On the symbolic side it
+produces ~28 false positives from OCR noise, and a symbolic holdout still needs
+a text-bearing vector P&ID — see "What I'd do next".
+
 ### External review: 3 fixes
 
 A second-opinion review flagged 4 issues; each was checked against the

@@ -1,0 +1,44 @@
+[
+ {
+  "did": "r0001",
+  "kind": "modify",
+  "role": "valve_tag",
+  "eid_a": null,
+  "eid_b": null,
+  "page": 0,
+  "zone_a": "D-3",
+  "zone_b": "D-3",
+  "field_changes": {
+   "symbol_type": [
+    "gate",
+    "globe"
+   ]
+  },
+  "description": "valve 5 on the LOX line: gate -> globe at a constant tag (graphical only; no text changes)",
+  "severity": "HIGH",
+  "detectable_by": "raster_only",
+  "semantic_null": false,
+  "sheet": 1
+ },
+ {
+  "did": "r0002",
+  "kind": "modify",
+  "role": "valve_tag",
+  "eid_a": null,
+  "eid_b": null,
+  "page": 0,
+  "zone_a": "F-5",
+  "zone_b": "F-5",
+  "field_changes": {
+   "symbol_type": [
+    "gate",
+    "globe"
+   ]
+  },
+  "description": "valve 2 upstream of the turbine: gate -> globe at a constant tag (graphical only; no text changes)",
+  "severity": "HIGH",
+  "detectable_by": "raster_only",
+  "semantic_null": false,
+  "sheet": 1
+ }
+]

@@ -1,0 +1,3 @@
+{"q": "What changed between these two revisions?", "expected_behavior": "answer", "a": "", "citations": []}
+{"q": "Are there any safety-relevant changes?", "expected_behavior": "answer", "a": "valve 5 on the LOX line: gate -> globe at a constant tag (graphical only; no text changes); valve 2 upstream of the turbine: gate -> globe at a constant tag (graphical only; no text changes)", "citations": ["r0001", "r0002"]}
+{"q": "What changed on page 9 of this drawing?", "expected_behavior": "refuse", "a": "This pair has 1 page.", "citations": []}
