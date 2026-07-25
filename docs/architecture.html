@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>delta-chat — Architecture</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --ink: #1a2233;
+    --muted: #5b6b8c;
+    --border: #d7dceb;
+    --accent: #5b6ee1;
+    --accent-soft: #e8edf7;
+    --mono: 'SF Mono', 'JetBrains Mono', Consolas, Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #12151f; --card: #1b2032; --ink: #e7ebf5; --muted: #97a3c0; --border: #2c3350; --accent: #8c9bff; --accent-soft: #232a44; }
+  }
+  :root[data-theme="dark"] { --bg: #12151f; --card: #1b2032; --ink: #e7ebf5; --muted: #97a3c0; --border: #2c3350; --accent: #8c9bff; --accent-soft: #232a44; }
+  :root[data-theme="light"] { --bg: #f4f6fb; --card: #ffffff; --ink: #1a2233; --muted: #5b6b8c; --border: #d7dceb; --accent: #5b6ee1; --accent-soft: #e8edf7; }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+  }
+  main { max-width: 1180px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  header { margin-bottom: 8px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 1.9rem;
+    margin: 6px 0 6px;
+    letter-spacing: -0.01em;
+  }
+  .sub { color: var(--muted); max-width: 68ch; font-size: 0.98rem; }
+
+  nav.legend {
+    display: flex; flex-wrap: wrap; gap: 10px 22px;
+    margin: 22px 0 30px;
+    padding: 14px 16px;
+    background: var(--accent-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  nav.legend b { color: var(--ink); }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+  .diagram-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    overflow: auto;
+    box-shadow: 0 1px 3px rgba(20, 24, 40, 0.06);
+  }
+  .diagram-card img {
+    display: block;
+    width: 100%;
+    max-width: none;
+    background: #ffffff;
+    border-radius: 6px;
+  }
+  .diagram-caption {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  section.notes { margin-top: 44px; }
+  section.notes h2 {
+    font-size: 1.05rem;
+    letter-spacing: -0.005em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  section.notes ul { padding-left: 1.2em; }
+  section.notes li { margin: 8px 0; color: var(--ink); }
+  section.notes li .tag {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 5px;
+    padding: 1px 6px;
+    margin-right: 6px;
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">delta-chat — architecture</div>
+    <h1>Document delta &amp; grounded chat, as-built</h1>
+    <p class="sub">Ingest → canonical IR → deterministic delta engine → report/markup →
+      grounded chat, with a homegrown tracer instrumenting all three and an eval
+      harness scoring every stage against ground truth. Rendered directly from
+      <code>docs/architecture.mmd</code> — this diagram and the source stay in sync
+      by regenerating, not by hand-editing.</p>
+  </header>
+
+  <nav class="legend">
+    <span><span class="swatch" style="background:#e8edf7;border:1px solid #5b6ee1;"></span><b>node</b> — a module / stage</span>
+    <span><span class="swatch" style="background:#f4f6fb;border:1px solid #c3cbe0;"></span><b>cluster</b> — a package (src/ingest, src/delta, …)</span>
+    <span>— solid arrow — data/control flow</span>
+    <span>┄┄ dotted arrow — declared but not implemented (L2 relations, L3 embeddings)</span>
+  </nav>
+
+  <div class="diagram-card">
+    <img src="architecture.svg" alt="delta-chat architecture diagram: ingest adapters feed a canonical document, which a deterministic delta engine (precheck, register, align, classify, severity) turns into a report and markup overlay, and which grounded chat retrieves over; a homegrown tracer instruments all three, and an eval harness scores the whole pipeline.">
+    <div class="diagram-caption">docs/architecture.svg — also available as .html (this page), .txt (ASCII), and .mmd (mermaid source)</div>
+  </div>
+
+  <section class="notes">
+    <h2>Reading the gaps honestly</h2>
+    <ul>
+      <li><span class="tag">L2 / L3</span>Relations and embeddings are declared in <code>CanonicalElement</code>/the architecture but never populated or implemented — shown dotted, not hidden.</li>
+      <li><span class="tag">DWG</span><code>DWGAdapter</code> is a real, documented stub (ODA/LibreDWG→DXF→ezdxf path) — not a working parser.</li>
+      <li><span class="tag">register.py</span>Real Umeyama similarity-transform estimation from anchor correspondences, verified exact against synthetic ground truth — but this dataset's own scanned pairs apply identical (not independently-randomized) skew to both revisions, so it can't be empirically demonstrated against them.</li>
+      <li><span class="tag">severity.py</span>Deterministic CRITICAL/HIGH/MEDIUM/LOW rule table, not LLM-judged — no eval ground truth exists for it, so it's spot-checked against known real deltas rather than scored through <code>eval/metrics.py</code>.</li>
+      <li><span class="tag">chat</span>Every LLM call is isolated to <code>llm.py</code>/<code>chat.py</code>: retrieval, citation parsing, and post-validation are all deterministic — an uncited or hallucinated-id answer is programmatically overridden into a refusal.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <span>delta-chat</span>
+    <span>generated via mermaid-cli from docs/architecture.mmd</span>
+  </footer>
+</main>
+</body>
+</html>

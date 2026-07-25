@@ -1,0 +1,1718 @@
+[
+ {
+  "eid": "ds_dp",
+  "role": "datasheet_row",
+  "text": "DISCHARGE / SUCTION DESIGN PRESS. (MAX) Barg FV / 286 / FV / 286",
+  "anchor_mm": [
+   581.0,
+   182
+  ],
+  "zone": "G-9",
+  "layer": "TEXT",
+  "attrs": {
+   "value": "DISCHARGE / SUCTION DESIGN PRESS. (MAX) Barg FV / 286 / FV / 286"
+  }
+ },
+ {
+  "eid": "ds_duty",
+  "role": "datasheet_row",
+  "text": "DUTY kW 1835",
+  "anchor_mm": [
+   581.0,
+   194
+  ],
+  "zone": "G-9",
+  "layer": "TEXT",
+  "attrs": {
+   "value": "DUTY kW 1835"
+  }
+ },
+ {
+  "eid": "ds_flow",
+  "role": "datasheet_row",
+  "text": "FLOW RATE kg/h 62809",
+  "anchor_mm": [
+   581.0,
+   188
+  ],
+  "zone": "G-9",
+  "layer": "TEXT",
+  "attrs": {
+   "value": "FLOW RATE kg/h 62809"
+  }
+ },
+ {
+  "eid": "ds_tag",
+  "role": "datasheet_row",
+  "text": "TAG NUMBER 26-KA-901",
+  "anchor_mm": [
+   581.0,
+   200
+  ],
+  "zone": "G-9",
+  "layer": "TEXT",
+  "attrs": {
+   "value": "TAG NUMBER 26-KA-901"
+  }
+ },
+ {
+  "eid": "ds_vendor",
+  "role": "datasheet_row",
+  "text": "VENDOR MAN ENERGY SOLUTIONS",
+  "anchor_mm": [
+   581.0,
+   176
+  ],
+  "zone": "H-9",
+  "layer": "TEXT",
+  "attrs": {
+   "value": "VENDOR MAN ENERGY SOLUTIONS"
+  }
+ },
+ {
+  "eid": "equip_lbl",
+  "role": "equipment_tag",
+  "text": "26-KA-901",
+  "anchor_mm": [
+   378.45,
+   333.0
+  ],
+  "zone": "E-6",
+  "layer": "TEXT",
+  "attrs": {
+   "system": "26",
+   "type": "KA",
+   "seq": 901
+  }
+ },
+ {
+  "eid": "gequip",
+  "role": "geom_circle",
+  "text": "",
+  "anchor_mm": [
+   378.45,
+   297.0
+  ],
+  "zone": "F-6",
+  "layer": "GEOM",
+  "attrs": {
+   "r": 30.0
+  }
+ },
+ {
+  "eid": "gline0",
+  "role": "geom_line",
+  "text": "",
+  "anchor_mm": [
+   178.26422965383486,
+   452.4858201149325
+  ],
+  "zone": "C-3",
+  "layer": "GEOM",
+  "attrs": {
+   "dx": 181.67272716157342,
+   "dy": 0.0
+  }
+ },
+ {
+  "eid": "gline1",
+  "role": "geom_line",
+  "text": "",
+  "anchor_mm": [
+   416.78258824916617,
+   118.54710132085793
+  ],
+  "zone": "I-6",
+  "layer": "GEOM",
+  "attrs": {
+   "dx": 66.91065241819544,
+   "dy": 0.0
+  }
+ },
+ {
+  "eid": "gline2",
+  "role": "geom_line",
+  "text": "",
+  "anchor_mm": [
+   217.39763040378082,
+   247.22276059882586
+  ],
+  "zone": "F-4",
+  "layer": "GEOM",
+  "attrs": {
+   "dx": 72.24754224544186,
+   "dy": 0.0
+  }
+ },
+ {
+  "eid": "gline3",
+  "role": "geom_line",
+  "text": "",
+  "anchor_mm": [
+   208.81535490925637,
+   446.55372159392687
+  ],
+  "zone": "C-3",
+  "layer": "GEOM",
+  "attrs": {
+   "dx": 63.245846386244,
+   "dy": 0.0
+  }
+ },
+ {
+  "eid": "gline4",
+  "role": "geom_line",
+  "text": "",
+  "anchor_mm": [
+   253.6305307025903,
+   187.41564431883234
+  ],
+  "zone": "G-4",
+  "layer": "GEOM",
+  "attrs": {
+   "dx": 99.4130464353521,
+   "dy": 0.0
+  }
+ },
+ {
+  "eid": "gline5",
+  "role": "geom_line",
+  "text": "",
+  "anchor_mm": [
+   163.65269957369497,
+   256.24708290615547
+  ],
+  "zone": "F-3",
+  "layer": "GEOM",
+  "attrs": {
+   "dx": 123.20533463420503,
+   "dy": 0.0
+  }
+ },
+ {
+  "eid": "inst00",
+  "role": "instrument",
+  "text": "TIT 9010 26 SD HH:160 LL:120",
+  "anchor_mm": [
+   301.60396831598916,
+   234.5735481079847
+  ],
+  "zone": "G-5",
+  "layer": "INSTR",
+  "attrs": {
+   "func": "TIT",
+   "loop": 9010,
+   "system": "26",
+   "setpoints": {
+    "HH": 160,
+    "LL": 120
+   }
+  }
+ },
+ {
+  "eid": "inst01",
+  "role": "instrument",
+  "text": "PSE 9011 26",
+  "anchor_mm": [
+   187.021240602172,
+   352.18871811282656
+  ],
+  "zone": "E-3",
+  "layer": "INSTR",
+  "attrs": {
+   "func": "PSE",
+   "loop": 9011,
+   "system": "26"
+  }
+ },
+ {
+  "eid": "inst02",
+  "role": "instrument",
+  "text": "TIT 9012 26",
+  "anchor_mm": [
+   307.92534963286374,
+   388.56814234775936
+  ],
+  "zone": "D-5",
+  "layer": "INSTR",
+  "attrs": {
+   "func": "TIT",
+   "loop": 9012,
+   "system": "26"
+  }
+ },
+ {
+  "eid": "inst03",
+  "role": "instrument",
+  "text": "PSE 9013 26 SD HH:245 LL:75",
+  "anchor_mm": [
+   337.7625319280758,
+   392.9030536917591
+  ],
+  "zone": "D-5",
+  "layer": "INSTR",
+  "attrs": {
+   "func": "PSE",
+   "loop": 9013,
+   "system": "26",
+   "setpoints": {
+    "HH": 245,
+    "LL": 75
+   }
+  }
+ },
+ {
+  "eid": "inst04",
+  "role": "instrument",
+  "text": "TIT 9014 26 SD HH:150 LL:110",
+  "anchor_mm": [
+   307.6116977293635,
+   337.3081131750689
+  ],
+  "zone": "E-5",
+  "layer": "INSTR",
+  "attrs": {
+   "func": "TIT",
+   "loop": 9014,
+   "system": "26",
+   "setpoints": {
+    "HH": 150,
+    "LL": 110
+   }
+  }
+ },
+ {
+  "eid": "inst05",
+  "role": "instrument",
+  "text": "FIT 9015 26",
+  "anchor_mm": [
+   517.2198045317853,
+   245.70846278201657
+  ],
+  "zone": "F-8",
+  "layer": "INSTR",
+  "attrs": {
+   "func": "FIT",
+   "loop": 9015,
+   "system": "26"
+  }
+ },
+ {
+  "eid": "inst06",
+  "role": "instrument",
+  "text": "PDIT 9016 26 SD HH:235 LL:120",
+  "anchor_mm": [
+   250.2263470673004,
+   433.1573004745563
+  ],
+  "zone": "C-4",
+  "layer": "INSTR",
+  "attrs": {
+   "func": "PDIT",
+   "loop": 9016,
+   "system": "26",
+   "setpoints": {
+    "HH": 235,
+    "LL": 120
+   }
+  }
+ },
+ {
+  "eid": "inst07",
+  "role": "instrument",
+  "text": "FIT 9017 26 SD HH:209 LL:50",
+  "anchor_mm": [
+   509.81495539174284,
+   352.2945923513139
+  ],
+  "zone": "E-8",
+  "layer": "INSTR",
+  "attrs": {
+   "func": "FIT",
+   "loop": 9017,
+   "system": "26",
+   "setpoints": {
+    "HH": 209,
+    "LL": 50
+   }
+  }
+ },
+ {
+  "eid": "inst08",
+  "role": "instrument",
+  "text": "TIT 9018 26 SD HH:150 LL:125",
+  "anchor_mm": [
+   344.05543621834215,
+   301.65109963986606
+  ],
+  "zone": "E-5",
+  "layer": "INSTR",
+  "attrs": {
+   "func": "TIT",
+   "loop": 9018,
+   "system": "26",
+   "setpoints": {
+    "HH": 150,
+    "LL": 125
+   }
+  }
+ },
+ {
+  "eid": "line00",
+  "role": "line_tag",
+  "text": "3\"-AI-26-9030-AC21S-03",
+  "anchor_mm": [
+   109.77221598424003,
+   405.2114687479899
+  ],
+  "zone": "D-2",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "3\"",
+   "service": "AI",
+   "system": "26",
+   "seq": "9030",
+   "pipe_class": "AC21S",
+   "insul": "03"
+  }
+ },
+ {
+  "eid": "line01",
+  "role": "line_tag",
+  "text": "10\"-GI-40-9031-AS20-38",
+  "anchor_mm": [
+   493.06351917663005,
+   424.14505428919045
+  ],
+  "zone": "C-8",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "10\"",
+   "service": "GI",
+   "system": "40",
+   "seq": "9031",
+   "pipe_class": "AS20",
+   "insul": "38"
+  }
+ },
+ {
+  "eid": "line02",
+  "role": "line_tag",
+  "text": "3\"-DO-43-9032-AC21-03",
+  "anchor_mm": [
+   413.1500151751431,
+   78.81987659533675
+  ],
+  "zone": "I-6",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "3\"",
+   "service": "DO",
+   "system": "43",
+   "seq": "9032",
+   "pipe_class": "AC21",
+   "insul": "03"
+  }
+ },
+ {
+  "eid": "line03",
+  "role": "line_tag",
+  "text": "10\"-PV-40-9033-EC11S-08",
+  "anchor_mm": [
+   123.51086741027268,
+   212.88499165931626
+  ],
+  "zone": "G-2",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "10\"",
+   "service": "PV",
+   "system": "40",
+   "seq": "9033",
+   "pipe_class": "EC11S",
+   "insul": "08"
+  }
+ },
+ {
+  "eid": "line04",
+  "role": "line_tag",
+  "text": "3\"-GI-43-9034-GD20S-03",
+  "anchor_mm": [
+   247.57084901231926,
+   74.65830454285485
+  ],
+  "zone": "I-4",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "3\"",
+   "service": "GI",
+   "system": "43",
+   "seq": "9034",
+   "pipe_class": "GD20S",
+   "insul": "03"
+  }
+ },
+ {
+  "eid": "line05",
+  "role": "line_tag",
+  "text": "6\"-DO-26-9035-GS20S-00",
+  "anchor_mm": [
+   190.5053449868143,
+   231.41306186293966
+  ],
+  "zone": "G-3",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "6\"",
+   "service": "DO",
+   "system": "26",
+   "seq": "9035",
+   "pipe_class": "GS20S",
+   "insul": "00"
+  }
+ },
+ {
+  "eid": "line06",
+  "role": "line_tag",
+  "text": "8\"-DO-26-9036-GC11S-38",
+  "anchor_mm": [
+   125.6017418131156,
+   293.8825385941466
+  ],
+  "zone": "F-2",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "8\"",
+   "service": "DO",
+   "system": "26",
+   "seq": "9036",
+   "pipe_class": "GC11S",
+   "insul": "38"
+  }
+ },
+ {
+  "eid": "line07",
+  "role": "line_tag",
+  "text": "10\"-AI-26-9037-GS20S-38",
+  "anchor_mm": [
+   501.7341603472552,
+   175.57452880293383
+  ],
+  "zone": "H-8",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "10\"",
+   "service": "AI",
+   "system": "26",
+   "seq": "9037",
+   "pipe_class": "GS20S",
+   "insul": "38"
+  }
+ },
+ {
+  "eid": "line08",
+  "role": "line_tag",
+  "text": "4\"-DC-43-9038-EC11S-08",
+  "anchor_mm": [
+   246.22735622809307,
+   244.2566461403096
+  ],
+  "zone": "F-4",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "4\"",
+   "service": "DC",
+   "system": "43",
+   "seq": "9038",
+   "pipe_class": "EC11S",
+   "insul": "08"
+  }
+ },
+ {
+  "eid": "line09",
+  "role": "line_tag",
+  "text": "3\"-GI-43-9039-AC21S-03",
+  "anchor_mm": [
+   457.04035596060834,
+   255.7346195355522
+  ],
+  "zone": "F-7",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "3\"",
+   "service": "GI",
+   "system": "43",
+   "seq": "9039",
+   "pipe_class": "AC21S",
+   "insul": "03"
+  }
+ },
+ {
+  "eid": "line10",
+  "role": "line_tag",
+  "text": "10\"-WC-40-9040-AS20-03",
+  "anchor_mm": [
+   383.11580540502274,
+   451.20623674567145
+  ],
+  "zone": "C-6",
+  "layer": "TEXT",
+  "attrs": {
+   "size": "10\"",
+   "service": "WC",
+   "system": "40",
+   "seq": "9040",
+   "pipe_class": "AS20",
+   "insul": "03"
+  }
+ },
+ {
+  "eid": "note00",
+  "role": "note",
+  "text": "1. LUBE OIL RESERVOIR VENT. OIL MIST SEPARATOR INSTALLED OFF-SKID.",
+  "anchor_mm": [
+   12,
+   560
+  ],
+  "zone": "A-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 1,
+   "body": "LUBE OIL RESERVOIR VENT. OIL MIST SEPARATOR INSTALLED OFF-SKID."
+  }
+ },
+ {
+  "eid": "note01",
+  "role": "note",
+  "text": "2. PRIMARY SEAL GAS IS TAKEN DOWNSTREAM LAST COMPRESSING STAGE. SKID INTERNAL DESIGN.",
+  "anchor_mm": [
+   12,
+   553
+  ],
+  "zone": "A-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 2,
+   "body": "PRIMARY SEAL GAS IS TAKEN DOWNSTREAM LAST COMPRESSING STAGE. SKID INTERNAL DESIGN."
+  }
+ },
+ {
+  "eid": "note02",
+  "role": "note",
+  "text": "3. OIL CHANGE BY USING TEMPORARY ARRANGEMENT WITH HOSES.",
+  "anchor_mm": [
+   12,
+   546
+  ],
+  "zone": "A-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 3,
+   "body": "OIL CHANGE BY USING TEMPORARY ARRANGEMENT WITH HOSES."
+  }
+ },
+ {
+  "eid": "note03",
+  "role": "note",
+  "text": "4. INSULATION THICKNESS TO BE TAKEN INTO CONSIDERATION ON TW SELECTION.",
+  "anchor_mm": [
+   12,
+   539
+  ],
+  "zone": "A-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 4,
+   "body": "INSULATION THICKNESS TO BE TAKEN INTO CONSIDERATION ON TW SELECTION."
+  }
+ },
+ {
+  "eid": "note04",
+  "role": "note",
+  "text": "5. MAX BACK-PRESSURE 1.5 BARG.",
+  "anchor_mm": [
+   12,
+   532
+  ],
+  "zone": "B-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 5,
+   "body": "MAX BACK-PRESSURE 1.5 BARG."
+  }
+ },
+ {
+  "eid": "note05",
+  "role": "note",
+  "text": "6. ATMOSPHERIC VENT.",
+  "anchor_mm": [
+   12,
+   525
+  ],
+  "zone": "B-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 6,
+   "body": "ATMOSPHERIC VENT."
+  }
+ },
+ {
+  "eid": "note06",
+  "role": "note",
+  "text": "7. LL SET POINT IS OVERRIDEN AT START-UP.",
+  "anchor_mm": [
+   12,
+   518
+  ],
+  "zone": "B-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 7,
+   "body": "LL SET POINT IS OVERRIDEN AT START-UP."
+  }
+ },
+ {
+  "eid": "note07",
+  "role": "note",
+  "text": "8. FLAME ARRESTER INCLUDES FLAME FILTER AND LOCATED AT END OF PIPE.",
+  "anchor_mm": [
+   12,
+   511
+  ],
+  "zone": "B-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 8,
+   "body": "FLAME ARRESTER INCLUDES FLAME FILTER AND LOCATED AT END OF PIPE."
+  }
+ },
+ {
+  "eid": "note08",
+  "role": "note_deleted",
+  "text": "9. DELETED.",
+  "anchor_mm": [
+   12,
+   504
+  ],
+  "zone": "B-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 9,
+   "body": "DELETED."
+  }
+ },
+ {
+  "eid": "note09",
+  "role": "note_deleted",
+  "text": "10. DELETED.",
+  "anchor_mm": [
+   12,
+   497
+  ],
+  "zone": "B-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 10,
+   "body": "DELETED."
+  }
+ },
+ {
+  "eid": "note10",
+  "role": "note",
+  "text": "11. HIGH POINT VENT AND LOW POINT DRAIN TO BE FINALIZED BY PIPING AS PER PIPING LAYOUT.",
+  "anchor_mm": [
+   12,
+   490
+  ],
+  "zone": "B-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 11,
+   "body": "HIGH POINT VENT AND LOW POINT DRAIN TO BE FINALIZED BY PIPING AS PER PIPING LAYOUT."
+  }
+ },
+ {
+  "eid": "note11",
+  "role": "note",
+  "text": "12. CHEMICAL CLEANING (CIP); BLEED/DRAIN CONNECTION.",
+  "anchor_mm": [
+   12,
+   483
+  ],
+  "zone": "B-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 12,
+   "body": "CHEMICAL CLEANING (CIP); BLEED/DRAIN CONNECTION."
+  }
+ },
+ {
+  "eid": "note12",
+  "role": "note",
+  "text": "13. PROVISION FOR FUTURE HOT GAS BYPASS LINE.",
+  "anchor_mm": [
+   12,
+   476
+  ],
+  "zone": "B-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 13,
+   "body": "PROVISION FOR FUTURE HOT GAS BYPASS LINE."
+  }
+ },
+ {
+  "eid": "note13",
+  "role": "note",
+  "text": "14. FROM SEAL GAS SYSTEM RUPTURE DISCS.",
+  "anchor_mm": [
+   12,
+   469
+  ],
+  "zone": "C-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 14,
+   "body": "FROM SEAL GAS SYSTEM RUPTURE DISCS."
+  }
+ },
+ {
+  "eid": "note14",
+  "role": "note",
+  "text": "15. BOTTOM ENTRY FOR SUCTION AND DISCHARGE NOZZLES.",
+  "anchor_mm": [
+   12,
+   462
+  ],
+  "zone": "C-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 15,
+   "body": "BOTTOM ENTRY FOR SUCTION AND DISCHARGE NOZZLES."
+  }
+ },
+ {
+  "eid": "note15",
+  "role": "note",
+  "text": "16. MAX BACK-PRESSURE 0.005 BARG.",
+  "anchor_mm": [
+   12,
+   455
+  ],
+  "zone": "C-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 16,
+   "body": "MAX BACK-PRESSURE 0.005 BARG."
+  }
+ },
+ {
+  "eid": "note16",
+  "role": "dcn_note",
+  "text": "17. THIS P&ID CONTAINS DCN-KP-0273-1.",
+  "anchor_mm": [
+   12,
+   448
+  ],
+  "zone": "C-1",
+  "layer": "NOTES",
+  "attrs": {
+   "note_no": 17,
+   "dcns": [
+    "DCN-KP-0273-1"
+   ]
+  }
+ },
+ {
+  "eid": "noz00",
+  "role": "nozzle",
+  "text": "N4200",
+  "anchor_mm": [
+   252.84378694338005,
+   148.64248543450864
+  ],
+  "zone": "H-4",
+  "layer": "TEXT",
+  "attrs": {
+   "noz_no": 4200
+  }
+ },
+ {
+  "eid": "noz01",
+  "role": "nozzle",
+  "text": "N4201",
+  "anchor_mm": [
+   163.27344099370896,
+   301.0965897110783
+  ],
+  "zone": "E-3",
+  "layer": "TEXT",
+  "attrs": {
+   "noz_no": 4201
+  }
+ },
+ {
+  "eid": "noz02",
+  "role": "nozzle",
+  "text": "N4202",
+  "anchor_mm": [
+   386.3315448241217,
+   348.91752863556815
+  ],
+  "zone": "E-6",
+  "layer": "TEXT",
+  "attrs": {
+   "noz_no": 4202
+  }
+ },
+ {
+  "eid": "noz03",
+  "role": "nozzle",
+  "text": "N4203",
+  "anchor_mm": [
+   204.54524156218872,
+   233.21845869871387
+  ],
+  "zone": "G-3",
+  "layer": "TEXT",
+  "attrs": {
+   "noz_no": 4203
+  }
+ },
+ {
+  "eid": "noz04",
+  "role": "nozzle",
+  "text": "N4204",
+  "anchor_mm": [
+   337.453638646108,
+   372.1419229111328
+  ],
+  "zone": "D-5",
+  "layer": "TEXT",
+  "attrs": {
+   "noz_no": 4204
+  }
+ },
+ {
+  "eid": "noz05",
+  "role": "nozzle",
+  "text": "N4205",
+  "anchor_mm": [
+   429.50606080187225,
+   145.33815608396753
+  ],
+  "zone": "H-7",
+  "layer": "TEXT",
+  "attrs": {
+   "noz_no": 4205
+  }
+ },
+ {
+  "eid": "noz06",
+  "role": "nozzle",
+  "text": "N4206",
+  "anchor_mm": [
+   517.4225363227604,
+   493.91903870910386
+  ],
+  "zone": "B-8",
+  "layer": "TEXT",
+  "attrs": {
+   "noz_no": 4206
+  }
+ },
+ {
+  "eid": "rev_a",
+  "role": "rev_row",
+  "text": "A  2026-01-15  ISSUED FOR DESIGN",
+  "anchor_mm": [
+   641.0,
+   48
+  ],
+  "zone": "J-10",
+  "layer": "TITLE",
+  "attrs": {
+   "rev": "A"
+  }
+ },
+ {
+  "eid": "tf_date",
+  "role": "title_field",
+  "text": "2026-01-15",
+  "anchor_mm": [
+   641.0,
+   38
+  ],
+  "zone": "J-10",
+  "layer": "TITLE",
+  "attrs": {
+   "field": "date"
+  }
+ },
+ {
+  "eid": "tf_drawno",
+  "role": "title_field",
+  "text": "0D204-PID-26-901-001",
+  "anchor_mm": [
+   641.0,
+   8
+  ],
+  "zone": "J-10",
+  "layer": "TITLE",
+  "attrs": {
+   "field": "drawno"
+  }
+ },
+ {
+  "eid": "tf_equip",
+  "role": "title_field",
+  "text": "26-KA-901",
+  "anchor_mm": [
+   641.0,
+   20
+  ],
+  "zone": "J-10",
+  "layer": "TITLE",
+  "attrs": {
+   "field": "equip"
+  }
+ },
+ {
+  "eid": "tf_rev",
+  "role": "title_field",
+  "text": "REV A",
+  "anchor_mm": [
+   641.0,
+   26
+  ],
+  "zone": "J-10",
+  "layer": "TITLE",
+  "attrs": {
+   "field": "rev"
+  }
+ },
+ {
+  "eid": "tf_sheet",
+  "role": "title_field",
+  "text": "SHEET 1 OF 1",
+  "anchor_mm": [
+   641.0,
+   32
+  ],
+  "zone": "J-10",
+  "layer": "TITLE",
+  "attrs": {
+   "field": "sheet"
+  }
+ },
+ {
+  "eid": "tf_title",
+  "role": "title_field",
+  "text": "3RD STAGE HP GAS EXPORT COMPRESSOR",
+  "anchor_mm": [
+   641.0,
+   14
+  ],
+  "zone": "J-10",
+  "layer": "TITLE",
+  "attrs": {
+   "field": "title"
+  }
+ },
+ {
+  "eid": "valve00",
+  "role": "valve_tag",
+  "text": "40CB9164",
+  "anchor_mm": [
+   405.90012053942905,
+   444.5505485387941
+  ],
+  "zone": "C-6",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "CB"
+  }
+ },
+ {
+  "eid": "valve01",
+  "role": "valve_tag",
+  "text": "26GB9111",
+  "anchor_mm": [
+   506.7914996026955,
+   280.5227436091749
+  ],
+  "zone": "F-8",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "GB"
+  }
+ },
+ {
+  "eid": "valve02",
+  "role": "valve_tag",
+  "text": "26GB9369",
+  "anchor_mm": [
+   105.28846209977465,
+   260.5931108510439
+  ],
+  "zone": "F-2",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "GB"
+  }
+ },
+ {
+  "eid": "valve03",
+  "role": "valve_tag",
+  "text": "40CH9280",
+  "anchor_mm": [
+   193.4612243335721,
+   320.96260317848987
+  ],
+  "zone": "E-3",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "CH"
+  }
+ },
+ {
+  "eid": "valve04",
+  "role": "valve_tag",
+  "text": "43CB9339",
+  "anchor_mm": [
+   168.99649108772525,
+   461.9889361551477
+  ],
+  "zone": "C-3",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "CB"
+  }
+ },
+ {
+  "eid": "valve05",
+  "role": "valve_tag",
+  "text": "43GB9179",
+  "anchor_mm": [
+   402.22429122550494,
+   499.45411008353284
+  ],
+  "zone": "B-6",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "GB"
+  }
+ },
+ {
+  "eid": "valve06",
+  "role": "valve_tag",
+  "text": "26CH9251",
+  "anchor_mm": [
+   251.54771502305562,
+   524.8496661270892
+  ],
+  "zone": "B-4",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "CH"
+  }
+ },
+ {
+  "eid": "valve07",
+  "role": "valve_tag",
+  "text": "26BL9124",
+  "anchor_mm": [
+   171.1749899352137,
+   379.0926821420381
+  ],
+  "zone": "D-3",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "BL"
+  }
+ },
+ {
+  "eid": "valve08",
+  "role": "valve_tag",
+  "text": "26CB9106",
+  "anchor_mm": [
+   306.48734876791934,
+   152.10551719293878
+  ],
+  "zone": "H-5",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "CB"
+  }
+ },
+ {
+  "eid": "valve09",
+  "role": "valve_tag",
+  "text": "26GT9050",
+  "anchor_mm": [
+   504.36032254934275,
+   473.4041050643949
+  ],
+  "zone": "C-8",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "GT"
+  }
+ },
+ {
+  "eid": "valve10",
+  "role": "valve_tag",
+  "text": "43GB9172",
+  "anchor_mm": [
+   531.012561652112,
+   205.19008043890875
+  ],
+  "zone": "G-8",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "GB"
+  }
+ },
+ {
+  "eid": "valve11",
+  "role": "valve_tag",
+  "text": "40GT9297",
+  "anchor_mm": [
+   454.85146062872644,
+   128.8207056574113
+  ],
+  "zone": "H-7",
+  "layer": "TEXT",
+  "attrs": {
+   "body": "GT"
+  }
+ },
+ {
+  "eid": "zc1",
+  "role": "zone_label",
+  "text": "1",
+  "anchor_mm": [
+   35.041666666666664,
+   4
+  ],
+  "zone": "J-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc10",
+  "role": "zone_label",
+  "text": "10",
+  "anchor_mm": [
+   665.7916666666666,
+   4
+  ],
+  "zone": "J-10",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc11",
+  "role": "zone_label",
+  "text": "11",
+  "anchor_mm": [
+   735.875,
+   4
+  ],
+  "zone": "J-11",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc12",
+  "role": "zone_label",
+  "text": "12",
+  "anchor_mm": [
+   805.9583333333334,
+   4
+  ],
+  "zone": "J-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc2",
+  "role": "zone_label",
+  "text": "2",
+  "anchor_mm": [
+   105.125,
+   4
+  ],
+  "zone": "J-2",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc3",
+  "role": "zone_label",
+  "text": "3",
+  "anchor_mm": [
+   175.20833333333334,
+   4
+  ],
+  "zone": "J-3",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc4",
+  "role": "zone_label",
+  "text": "4",
+  "anchor_mm": [
+   245.29166666666669,
+   4
+  ],
+  "zone": "J-4",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc5",
+  "role": "zone_label",
+  "text": "5",
+  "anchor_mm": [
+   315.375,
+   4
+  ],
+  "zone": "J-5",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc6",
+  "role": "zone_label",
+  "text": "6",
+  "anchor_mm": [
+   385.4583333333333,
+   4
+  ],
+  "zone": "J-6",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc7",
+  "role": "zone_label",
+  "text": "7",
+  "anchor_mm": [
+   455.54166666666663,
+   4
+  ],
+  "zone": "J-7",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc8",
+  "role": "zone_label",
+  "text": "8",
+  "anchor_mm": [
+   525.625,
+   4
+  ],
+  "zone": "J-8",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zc9",
+  "role": "zone_label",
+  "text": "9",
+  "anchor_mm": [
+   595.7083333333334,
+   4
+  ],
+  "zone": "J-9",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct1",
+  "role": "zone_label",
+  "text": "1",
+  "anchor_mm": [
+   35.041666666666664,
+   590.0
+  ],
+  "zone": "A-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct10",
+  "role": "zone_label",
+  "text": "10",
+  "anchor_mm": [
+   665.7916666666666,
+   590.0
+  ],
+  "zone": "A-10",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct11",
+  "role": "zone_label",
+  "text": "11",
+  "anchor_mm": [
+   735.875,
+   590.0
+  ],
+  "zone": "A-11",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct12",
+  "role": "zone_label",
+  "text": "12",
+  "anchor_mm": [
+   805.9583333333334,
+   590.0
+  ],
+  "zone": "A-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct2",
+  "role": "zone_label",
+  "text": "2",
+  "anchor_mm": [
+   105.125,
+   590.0
+  ],
+  "zone": "A-2",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct3",
+  "role": "zone_label",
+  "text": "3",
+  "anchor_mm": [
+   175.20833333333334,
+   590.0
+  ],
+  "zone": "A-3",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct4",
+  "role": "zone_label",
+  "text": "4",
+  "anchor_mm": [
+   245.29166666666669,
+   590.0
+  ],
+  "zone": "A-4",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct5",
+  "role": "zone_label",
+  "text": "5",
+  "anchor_mm": [
+   315.375,
+   590.0
+  ],
+  "zone": "A-5",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct6",
+  "role": "zone_label",
+  "text": "6",
+  "anchor_mm": [
+   385.4583333333333,
+   590.0
+  ],
+  "zone": "A-6",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct7",
+  "role": "zone_label",
+  "text": "7",
+  "anchor_mm": [
+   455.54166666666663,
+   590.0
+  ],
+  "zone": "A-7",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct8",
+  "role": "zone_label",
+  "text": "8",
+  "anchor_mm": [
+   525.625,
+   590.0
+  ],
+  "zone": "A-8",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zct9",
+  "role": "zone_label",
+  "text": "9",
+  "anchor_mm": [
+   595.7083333333334,
+   590.0
+  ],
+  "zone": "A-9",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrA",
+  "role": "zone_label",
+  "text": "A",
+  "anchor_mm": [
+   4,
+   564.3
+  ],
+  "zone": "A-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrB",
+  "role": "zone_label",
+  "text": "B",
+  "anchor_mm": [
+   4,
+   504.9
+  ],
+  "zone": "B-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrC",
+  "role": "zone_label",
+  "text": "C",
+  "anchor_mm": [
+   4,
+   445.5
+  ],
+  "zone": "C-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrD",
+  "role": "zone_label",
+  "text": "D",
+  "anchor_mm": [
+   4,
+   386.1
+  ],
+  "zone": "D-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrE",
+  "role": "zone_label",
+  "text": "E",
+  "anchor_mm": [
+   4,
+   326.7
+  ],
+  "zone": "E-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrF",
+  "role": "zone_label",
+  "text": "F",
+  "anchor_mm": [
+   4,
+   267.29999999999995
+  ],
+  "zone": "F-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrG",
+  "role": "zone_label",
+  "text": "G",
+  "anchor_mm": [
+   4,
+   207.89999999999998
+  ],
+  "zone": "G-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrH",
+  "role": "zone_label",
+  "text": "H",
+  "anchor_mm": [
+   4,
+   148.5
+  ],
+  "zone": "H-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrI",
+  "role": "zone_label",
+  "text": "I",
+  "anchor_mm": [
+   4,
+   89.10000000000002
+  ],
+  "zone": "I-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrJ",
+  "role": "zone_label",
+  "text": "J",
+  "anchor_mm": [
+   4,
+   29.700000000000045
+  ],
+  "zone": "J-1",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrA",
+  "role": "zone_label",
+  "text": "A",
+  "anchor_mm": [
+   837.0,
+   564.3
+  ],
+  "zone": "A-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrB",
+  "role": "zone_label",
+  "text": "B",
+  "anchor_mm": [
+   837.0,
+   504.9
+  ],
+  "zone": "B-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrC",
+  "role": "zone_label",
+  "text": "C",
+  "anchor_mm": [
+   837.0,
+   445.5
+  ],
+  "zone": "C-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrD",
+  "role": "zone_label",
+  "text": "D",
+  "anchor_mm": [
+   837.0,
+   386.1
+  ],
+  "zone": "D-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrE",
+  "role": "zone_label",
+  "text": "E",
+  "anchor_mm": [
+   837.0,
+   326.7
+  ],
+  "zone": "E-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrF",
+  "role": "zone_label",
+  "text": "F",
+  "anchor_mm": [
+   837.0,
+   267.29999999999995
+  ],
+  "zone": "F-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrG",
+  "role": "zone_label",
+  "text": "G",
+  "anchor_mm": [
+   837.0,
+   207.89999999999998
+  ],
+  "zone": "G-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrH",
+  "role": "zone_label",
+  "text": "H",
+  "anchor_mm": [
+   837.0,
+   148.5
+  ],
+  "zone": "H-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrI",
+  "role": "zone_label",
+  "text": "I",
+  "anchor_mm": [
+   837.0,
+   89.10000000000002
+  ],
+  "zone": "I-12",
+  "layer": "BORDER",
+  "attrs": {}
+ },
+ {
+  "eid": "zrrJ",
+  "role": "zone_label",
+  "text": "J",
+  "anchor_mm": [
+   837.0,
+   29.700000000000045
+  ],
+  "zone": "J-12",
+  "layer": "BORDER",
+  "attrs": {}
+ }
+]

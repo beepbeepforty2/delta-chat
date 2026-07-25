@@ -1,0 +1,37 @@
+# Domain alias table for src/chat/retrieval.py's BM25 query expansion.
+#
+# BM25 is purely lexical (deliberately -- no vector DB, see retrieval.py's
+# module docstring), so a natural-language question sharing zero literal
+# tokens with the drawing's actual notation retrieves nothing: "trip"
+# shares no token with the printed form "...SD HH:150 LL:120", "spec"
+# shares none with the field name "pipe_class". This table is a first
+# pass grounded in this project's own tag vocabulary
+# (src/canonical/tags.py's field names, the SD/HH/LL convention in
+# INSTRUMENT_RE) -- not exhaustive P&ID jargon. Extend it as real usage
+# surfaces gaps; each entry maps a natural phrase to the literal tokens
+# actually printed on the drawing / stored in element attrs.
+#
+# Multi-word keys are matched as substrings of the (lowercased) query
+# text; single-word keys are matched per query token.
+
+trip: [sd, hh, ll]
+tripped: [sd, hh, ll]
+shutdown: [sd]
+shut down: [sd]
+high high: [hh]
+low low: [ll]
+alarm: [hh, ll, h, l]
+setpoint: [hh, ll, sd]
+spec: [pipe_class]
+material: [pipe_class]
+material spec: [pipe_class]
+rating: [pipe_class]
+pressure rating: [pipe_class]
+tag number: [equipment_tag]
+equipment number: [equipment_tag]
+p&id: [pid]
+pid: [pid]
+revision: [rev]
+rev: [rev]
+deleted: [deleted]
+removed note: [deleted]

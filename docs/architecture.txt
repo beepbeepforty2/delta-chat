@@ -1,0 +1,181 @@
+================================================================================
+                delta-chat -- architecture (current, as-built)
+================================================================================
+
+   PID A file                              PID B file
+       |                                        |
+       +--------------------+-------------------+
+                            |
+                            v
+                 +-----------------------+
+                 |   adapter.detect()     |   src/ingest/  (FormatAdapter seam)
+                 +-----------------------+
+                  text-rich | .dwg | text-sparse
+              +--------------+     +--------------+
+              v              v                    v
+   +--------------------+  +----------------+  +------------------------+
+   | PdfNativeAdapter    |  | DWGAdapter      |  | PdfScannedAdapter       |
+   | (fitz extraction)   |  | (real stub --   |  | (pytesseract OCR)       |
+   |                     |  |  not impl.)     |  |                         |
+   +--------------------+  +----------------+  +------------------------+
+              |                                            |
+              +------------------------+-------------------+
+                                       |
+                                       v
+                        +-------------------------------+
+                        |       CanonicalDocument        |  src/canonical/
+                        +-------------------------------+   (layered IR)
+                          |           |           |      \
+                          v           v           v       v
+                  +----------+  +-----------+  +--------+  +-----------+
+                  |    L0    |  |    L1     |  |   L2   |  |    L3     |
+                  |  raster  |  | elements  |  |relat-  |  | embed-    |
+                  | (PNG per |  | (typed,   |  |ions    |  | dings     |
+                  |  sheet)  |  |  zoned,   |  |(decl., |  | (not      |
+                  |          |  |  bbox)    |  | never  |  | impl.)    |
+                  |          |  |           |  | popul.)|  |           |
+                  +----------+  +-----------+  +--------+  +-----------+
+                                  |    |    |
+                                  v    v    v
+                             zones.py tags.py classify.py
+                             (border- (composite (element-
+                              grid)    tags)      type)
+
+                                       |
+                                       v
+   ============================================================================
+   src/delta/  -- deterministic pipeline
+   ============================================================================
+                        +-------------------------------+
+                        |  precheck.py                   |
+                        |  same document?                |
+                        +-------------------------------+
+                             no |            | yes
+                    +-----------+            +----------------------+
+                    v                                                v
+        [refuse: not_a_pair]                          +-------------------------------+
+                                                        |  register.py                   |
+                                                        |  Umeyama similarity transform   |
+                                                        |  from anchor correspondences    |
+                                                        +-------------------------------+
+                                                                       |
+                                                                       v
+                                                        +-------------------------------+
+                                                        |  align.py :: match_sheets      |
+                                                        +-------------------------------+
+                                                                       |
+                                                                       v
+                                                        +-------------------------------+
+                                                        |  align.py :: match_elements    |
+                                                        |  (Hungarian bipartite match)   |
+                                                        +-------------------------------+
+                                                                       |
+                                                                       v
+                                                        +-------------------------------+
+                                                        |  classify.py                   |
+                                                        |  add / remove / modify / move  |
+                                                        |  + cascade grouping            |
+                                                        +-------------------------------+
+                                                                       |
+                                                                       v
+                                                        +-------------------------------+
+                                                        |  severity.py                   |
+                                                        |  CRITICAL / HIGH / MEDIUM / LOW|
+                                                        +-------------------------------+
+                                                              |                |
+                                                              v                v
+                                          +-------------------------+  +-------------------------------+
+                                          |  report.py               |  |  markup/overlay.py             |
+                                          |  delta_report.json / .md |  |  annotated raster PNGs         |
+                                          |                          |  |  (add/remove/modify/move,      |
+                                          |                          |  |   colored + legended)          |
+                                          +-------------------------+  +-------------------------------+
+
+                                                                       |
+                                                                       v
+   ============================================================================
+   src/chat/  -- grounded Q&A                     (also consumes CanonicalDocument
+   ============================================================================    A + B directly, alongside deltas)
+                                          +-------------------------------+
+                                          |  retrieval.py                  |
+                                          |  build_chunks(A, B, deltas)    |
+                                          +-------------------------------+
+                                                        |
+                                                        v
+                                          +-------------------------------+
+                                          |  BM25Index                     |
+                                          |  homegrown Okapi BM25,         |
+                                          |  delta-source boost,           |
+                                          |  zone-aware indexing           |
+                                          +-------------------------------+
+                                                        |
+                                                        v
+                                          +-------------------------------+
+                                          |  chat.py :: answer()           |
+                                          +-------------------------------+
+                                                        |
+                                                        v
+                                          +-------------------------------+
+                                          |  llm.py                        |
+                                          |  GLM via Anthropic-compatible  |
+                                          |  API (base_url + auth_token)   |
+                                          +-------------------------------+
+                                                        |
+                                                        v
+                                          +-------------------------------+
+                                          |  citations.py                  |
+                                          |  post-validate ids;            |
+                                          |  forced refusal if unsupported |
+                                          +-------------------------------+
+                                                        |
+                                                        v
+                                          +-------------------------------+
+                                          |  ChatAnswer                    |
+                                          |  (text, citations, refused,    |
+                                          |   reason)                      |
+                                          +-------------------------------+
+
+   ============================================================================
+   src/observability/  -- homegrown tracer
+   ============================================================================
+   Tracer: spans . correlation id . per-span timings . JSONL structured logs .
+   one JSON trace file per request . LLM span telemetry (prompt/response/
+   model/tokens/cost)
+   instruments  --->  Ingest, Delta Engine (register/align/classify spans),
+                       and Chat (retrieval + chat_answer spans)
+
+   ============================================================================
+   eval/  -- harness
+   ============================================================================
+   +-------------------------------+          +-------------------------------+
+   |  datasets/generator            |          |  baselines/llm_direct.py       |
+   |  seeded pairs + 3-layer GT     |          |  3x @ temperature=0,           |
+   |  (elements / correspondence /  |          |  scored through the identical  |
+   |   deltas)                      |          |  score_pair path                |
+   +-------------------------------+          +-------------------------------+
+                    \                                    /
+                     \                                  /
+                      v                                v
+                        +-------------------------------+
+                        |  run_eval.py                   |   <--- also reads
+                        +-------------------------------+        delta_report.json
+                                       |                          and ChatAnswer output
+                                       v
+              +-----------------------------------------------------+
+              |  scorecard:                                          |
+              |   - delta P/R/F1 (overall / per kind / per format    |
+              |     level / primary-cascade-semantic_null)           |
+              |   - null-pair false-positive count per null kind     |
+              |   - not_a_pair refusal check                         |
+              |   - chat correctness (LLM-judge, 5/5 validated vs    |
+              |     hand-checked) / groundedness / refusal accuracy  |
+              |   - llm_direct baseline variance (the measured       |
+              |     determinism argument)                            |
+              +-----------------------------------------------------+
+
+--------------------------------------------------------------------------------
+Legend
+--------------------------------------------------------------------------------
+  -->   data / control flow
+  \-\-   declared-but-not-implemented path (L2 relations, L3 embeddings, DWG)
+  [ ]    terminal outcome (refusal)

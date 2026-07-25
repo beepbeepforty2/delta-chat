@@ -1,0 +1,22 @@
+# secrets -- never commit
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# generated / regenerable (see Makefile: make dataset, make run, make eval)
+eval/datasets/v0/
+eval/results/
+raster_cache/
+reports/
+traces/
+
+# os cruft
+.DS_Store

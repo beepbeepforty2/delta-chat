@@ -1,0 +1,64 @@
+flowchart TD
+    subgraph Ingest["src/ingest/ — FormatAdapter seam"]
+        FA[PID A file]
+        FB[PID B file]
+        DET{"adapter.detect()"}
+        FA --> DET
+        FB --> DET
+        DET -->|text-rich| PN["PdfNativeAdapter\n(fitz extraction)"]
+        DET -->|text-sparse| PS["PdfScannedAdapter\n(pytesseract OCR)"]
+        DET -->|.dwg| DWG["DWGAdapter\n(real stub — not implemented)"]
+    end
+
+    subgraph Canonical["src/canonical/ — layered IR"]
+        PN --> CD["CanonicalDocument"]
+        PS --> CD
+        CD --> L0["L0 raster\n(retained PNG per sheet)"]
+        CD --> L1["L1 elements\n(typed, zoned, bbox, extraction_confidence)"]
+        CD -.->|declared, never populated| L2["L2 relations"]
+        CD -.->|not implemented| L3["L3 embeddings"]
+        L1 --- ZN["zones.py\nborder-grid A–J × 1–12"]
+        L1 --- TG["tags.py\ncomposite tag parsing"]
+        L1 --- CL["classify.py\nelement-type classification"]
+    end
+
+    subgraph DeltaEngine["src/delta/ — deterministic pipeline"]
+        CD --> PC{"precheck.py\nsame document?"}
+        PC -->|"no"| REFUSE(["refuse: not_a_pair"])
+        PC -->|"yes"| REG["register.py\nUmeyama similarity transform\nfrom anchor correspondences"]
+        REG --> MS["align.py\nmatch_sheets"]
+        MS --> ME["align.py\nmatch_elements\n(Hungarian bipartite match)"]
+        ME --> CLS["classify.py\nadd / remove / modify / move\n+ cascade grouping"]
+        CLS --> SEV["severity.py\nCRITICAL / HIGH / MEDIUM / LOW"]
+    end
+
+    subgraph Output["Report + Markup"]
+        SEV --> RPT["report.py\ndelta_report.json / .md"]
+        SEV --> MKP["markup/overlay.py\nannotated raster PNGs\n(add/remove/modify/move, colored + legended)"]
+        CD --> MKP
+    end
+
+    subgraph Chat["src/chat/ — grounded Q&A"]
+        CD --> CHK["retrieval.py\nbuild_chunks(A, B, deltas)"]
+        SEV --> CHK
+        CHK --> BM25["BM25Index\n(homegrown Okapi BM25,\ndelta-source boost, zone-aware)"]
+        BM25 --> ANS["chat.py: answer()"]
+        ANS --> LLMC["llm.py\nGLM via Anthropic-compatible API\n(base_url + auth_token)"]
+        LLMC --> CIT["citations.py\npost-validate ids;\nforced refusal if unsupported"]
+        CIT --> OUT["ChatAnswer\n(text, citations, refused, reason)"]
+    end
+
+    subgraph Obs["src/observability/ — homegrown tracer"]
+        TR["Tracer\nspans · correlation id · JSONL logs ·\nper-request trace file · LLM span telemetry"]
+    end
+    Ingest -.instruments.-> TR
+    DeltaEngine -.instruments.-> TR
+    Chat -.instruments.-> TR
+
+    subgraph Eval["eval/ — harness"]
+        GEN["eval/datasets/generator\nseeded pairs + 3-layer GT\n(elements / correspondence / deltas)"] --> RE["run_eval.py"]
+        RPT --> RE
+        OUT --> RE
+        BASE["baselines/llm_direct.py\n3× @ temp=0, same score_pair path"] --> RE
+        RE --> SC["scorecard:\ndelta P/R/F1 (overall/kind/level/primary-cascade-null) ·\nnull-pair FP · not_a_pair refusal ·\nchat correctness (LLM-judge, 5/5 validated) /\ngroundedness / refusal accuracy ·\nllm_direct variance"]
+    end

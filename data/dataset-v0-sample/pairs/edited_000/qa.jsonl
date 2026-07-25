@@ -1,0 +1,5 @@
+{"q": "What changed on sheet 1?", "expected_behavior": "answer", "a": "5 primary change(s): '8\"-VA-43-9005-AS20-00' relocated I-6 -> H-6 (content unchanged); note inserted at position 11: STRAINER TO BE REMOVED AFTER COMMISSIONING.; revision A -> B; revision table row B added; DCN record appended: DCN-KP-0904-1", "citations": ["d0001", "d0002", "d0009", "d0010", "d0011"]}
+{"q": "Did anything change in zone B-1?", "expected_behavior": "answer", "a": "Yes: note inserted at position 11: STRAINER TO BE REMOVED AFTER COMMISSIONING.", "citations": ["d0002"]}
+{"q": "Did any alarm or trip setpoints change?", "expected_behavior": "answer", "a": "No setpoint changes between these revisions.", "citations": []}
+{"q": "What changed on sheet 7?", "expected_behavior": "refuse", "a": "There is no sheet 7; the document has 1 sheet.", "citations": []}
+{"q": "What is the HH setpoint of FIT-9050 in the revised document?", "expected_behavior": "answer", "a": "150", "citations": ["inst00"]}

@@ -1,0 +1,24 @@
+# secrets -- never let these into the build context
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# regenerable / not needed in the image (make dataset regenerates fresh
+# inside the build instead of copying whatever's on the host)
+eval/datasets/v0/
+eval/results/
+raster_cache/
+reports/
+traces/
+
+# vcs / os cruft
+.git/
+.gitignore
+.DS_Store

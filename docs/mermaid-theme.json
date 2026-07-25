@@ -1,0 +1,25 @@
+{
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "'JetBrains Mono', 'SF Mono', Consolas, monospace",
+    "fontSize": "15px",
+    "primaryColor": "#e8edf7",
+    "primaryTextColor": "#1a2233",
+    "primaryBorderColor": "#5b6ee1",
+    "lineColor": "#5b6b8c",
+    "secondaryColor": "#eef2f9",
+    "tertiaryColor": "#ffffff",
+    "clusterBkg": "#f4f6fb",
+    "clusterBorder": "#c3cbe0",
+    "edgeLabelBackground": "#f4f6fb",
+    "titleColor": "#1a2233",
+    "nodeTextColor": "#1a2233"
+  },
+  "flowchart": {
+    "curve": "basis",
+    "padding": 18,
+    "nodeSpacing": 45,
+    "rankSpacing": 55,
+    "htmlLabels": true
+  }
+}
