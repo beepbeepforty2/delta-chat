@@ -11,6 +11,24 @@ chat over both revisions and the delta with citations.
 [LICENSE](LICENSE). No rights are granted to use this code beyond
 evaluation without prior written permission.
 
+## A note of thanks
+
+I built this on a simple principle: **a human as the guide, AI as the tool
+and the coder.** Every decision that mattered — what to build, what to cut,
+which trade-off to accept, when a result looked too good to trust — was
+mine; the code and much of the careful reasoning behind it came from models
+working under that direction. My thanks to **Claude Code**, the harness this
+was written in; to **Claude Opus** and **Claude Sonnet** for the design
+conversations and the implementation; to **GLM 5.2** and its harness, which
+powers the grounded-chat feature you'll see running in the traces and the
+scorecard, not just the building of it; and to **Gemini** and **ChatGPT**
+for planning and review passes that caught real issues from outside the main
+thread of work. Having them check each other's output turned out to be one
+of the most useful things here — several of the bugs recorded in
+[`docs/findings.md`](docs/findings.md) were found exactly that way, then
+verified against real data rather than taken on trust. The judgement, the
+direction, and the responsibility for what this repo claims are mine.
+
 ## What this is
 
 Ingest → canonical layered representation → deterministic delta engine →
