@@ -1,0 +1,87 @@
+# Zero-config entry points for the common flows.
+#
+#   docker compose run --rm demo       # delta report on a real vendor pair
+#   docker compose run --rm eval       # deterministic scorecard
+#   docker compose run --rm chat       # grounded chat        (needs .env)
+#   docker compose run --rm eval-full  # full scorecard       (needs .env)
+#   docker compose run --rm shell      # poke around
+#
+# `run --rm`, not `up`: these are one-shot commands that print and exit, not
+# long-lived services.
+#
+# Deliberately NO bind mounts on the default services. The image runs as a
+# non-root user (uid 1000), and a host directory owned by a different uid --
+# routine on Linux -- makes a mounted path unwritable, which would turn a
+# "just run this" demo into a permissions bug report. Every service below
+# therefore writes inside the container and prints what matters to stdout.
+# To keep the artifacts, add a mount explicitly:
+#
+#   docker compose run --rm -v "$PWD/reports:/app/reports" demo
+#
+# (On Linux, add `--user "$(id -u):$(id -g)"` to that if the mount is
+# read-only to the container user.)
+
+x-base: &base
+  build: .
+  image: delta-chat:latest
+
+services:
+  # The DEMO.md walkthrough: a real vendor revision pair -> delta report,
+  # printed to stdout. No credential, no mount, no arguments.
+  # NB: keep this a single-line string. A YAML folded scalar (`>`) only folds
+  # newlines between lines at the SAME indentation -- more-indented
+  # continuation lines keep their newlines, which turned this into four
+  # separate shell commands and broke the service. Caught by running it.
+  demo:
+    <<: *base
+    command: ["sh", "-c", "uv run python -m src.cli run --a data/samples/real_pair/a/L0.pdf --b data/samples/real_pair/b/L0.pdf --out reports/ && echo && cat reports/delta_report.md"]
+
+  # Deterministic half of the scorecard: delta P/R/F1, confidence
+  # calibration, semantic-null detection, null-pair and not-a-pair controls.
+  # Same as the image's default command. No credential needed.
+  eval:
+    <<: *base
+    command: ["uv", "run", "python", "-m", "eval.run_eval",
+              "--dataset", "eval/datasets/v0", "--skip-chat", "--skip-baseline"]
+
+  # Full scorecard: adds chat correctness/groundedness/refusal accuracy and
+  # the llm_direct baseline. Needs a credential -- copy .env.example to .env.
+  eval-full:
+    <<: *base
+    env_file: [.env]
+    command: ["uv", "run", "python", "-m", "eval.run_eval",
+              "--dataset", "eval/datasets/v0"]
+
+  # Interactive grounded chat over the sample pair. Needs a credential.
+  #
+  # Uses `entrypoint` rather than `command` on purpose: `docker compose run`
+  # REPLACES a service's command with any trailing arguments, so with
+  # `command:` the natural
+  #     docker compose run --rm chat --question "what changed?"
+  # dies with `exec: "--question": executable file not found`. As an
+  # entrypoint, trailing args append instead, so both the bare interactive
+  # form and the --question form work.
+  chat:
+    <<: *base
+    env_file: [.env]
+    stdin_open: true
+    tty: true
+    entrypoint: ["uv", "run", "python", "-m", "src.cli", "chat",
+                 "--a", "data/samples/real_pair/a/L0.pdf",
+                 "--b", "data/samples/real_pair/b/L0.pdf"]
+    command: []
+
+  # Your own two PDFs: put revA.pdf and revB.pdf in ./mypdfs on the host.
+  # This one mounts by design -- both the input and the output are yours.
+  mine:
+    <<: *base
+    volumes:
+      - ./mypdfs:/data
+    command: ["uv", "run", "python", "-m", "src.cli", "run",
+              "--a", "/data/revA.pdf", "--b", "/data/revB.pdf", "--out", "/data/reports"]
+
+  shell:
+    <<: *base
+    stdin_open: true
+    tty: true
+    command: ["bash"]

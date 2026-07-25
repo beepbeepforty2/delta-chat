@@ -29,6 +29,13 @@ WORKDIR /app
 COPY . .
 RUN uv sync --extra dev --frozen
 
+# The venv is fully built above and the source never changes after this, so
+# `uv run` must not re-resolve at container start. Without this, every run
+# reprints "Building delta-chat @ file:///app / Uninstalled 1 package /
+# Installed 1 package" before its real output -- harmless, but it reads like
+# something is wrong on a demo's very first command.
+ENV UV_NO_SYNC=1
+
 RUN make dataset && make test
 
 # No reason to run a CLI tool as root.

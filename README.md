@@ -260,39 +260,94 @@ The scanned-PDF adapter needs the `tesseract` binary on `PATH` (a system
 dependency, not pip-installable): `brew install tesseract` on macOS,
 `apt install tesseract-ocr` on Debian/Ubuntu.
 
-### Docker
+### Docker — zero-setup run
+
+Nothing to install but Docker itself. No Python, no `uv`, no `tesseract`,
+no credential, no dataset build, and **no volume mounts**:
+
+```bash
+docker compose run --rm demo    # real vendor revision pair -> delta report
+docker compose run --rm eval    # deterministic scorecard
+```
+
+`demo` reproduces section 1 of [`DEMO.md`](DEMO.md) and prints the delta
+report to stdout. Both build the image on first use.
+
+| Service | What it does | Credential |
+|---|---|---|
+| `demo` | Delta report on the real vendor pair in `data/samples/` | — |
+| `eval` | Deterministic scorecard (delta P/R/F1, calibration, null-pair controls) | — |
+| `chat` | Interactive grounded chat over the sample pair | `.env` |
+| `eval-full` | Full scorecard incl. chat metrics + `llm_direct` baseline | `.env` |
+| `mine` | Your own PDFs — drop `revA.pdf`/`revB.pdf` in `./mypdfs` | — |
+| `shell` | A shell in the image | — |
+
+The sample pairs are baked into the image, which is what lets `demo` and
+`eval` run with no mount and no arguments. The default services
+deliberately **don't** bind-mount: the image runs as a non-root user
+(uid 1000), and a host directory owned by a different uid — routine on
+Linux — would make a mounted output path unwritable and turn a one-command
+demo into a permissions bug. To keep the generated files:
+
+```bash
+docker compose run --rm -v "$PWD/reports:/app/reports" demo
+```
+
+Plain `docker` works too, if you'd rather not use compose:
 
 ```bash
 docker build -t delta-chat .
-docker run --rm delta-chat        # deterministic-only scorecard, no credential needed
+docker run --rm delta-chat                        # deterministic scorecard
+docker run --rm --env-file .env delta-chat \
+  uv run python -m eval.run_eval --dataset eval/datasets/v0   # full scorecard
 ```
 
 The build bakes in `make dataset` and runs the full test suite as a build
-step — a failed test fails the build. Fully hermetic: no credential
-needed to build (every chat-related test injects a fake LLM call, never a
-live one).
+step — a failed test fails the build, so a built image is itself evidence
+the containerized environment works. Fully hermetic: no credential needed
+to build (every chat-related test injects a fake LLM call, never a live
+one), and `.dockerignore` keeps `.env` out of the build context so a
+credential can never be baked into a layer.
 
-```bash
-# full scorecard incl. chat + llm_direct baseline -- needs a credential,
-# passed at run time, never baked into the image
-docker run --rm --env-file .env delta-chat \
-  uv run python -m eval.run_eval --dataset eval/datasets/v0
+`ENTRYPOINT` is left unset — any command after the image name replaces the
+default. Commands needing the project's dependencies must go through
+`uv run` (`uv run python ...`, `make test`, a bare `bash` are all fine —
+`make`'s targets already call `uv run` internally); a bare `python -m ...`
+would hit the base image's system Python, which has none of the project's
+dependencies, since those live in the `uv`-managed `.venv`.
 
-# run against your own two PDFs
-docker run --rm -v "$(pwd)/mypdfs:/data" delta-chat \
-  uv run python -m src.cli run --a /data/revA.pdf --b /data/revB.pdf --out /data/reports
-```
+#### Verified, and what verifying it caught
 
-`ENTRYPOINT` is left unset — any command after the image name replaces
-the default. Commands that need the project's dependencies must go
-through `uv run` (`uv run python ...`, `make test`, a bare `bash` are all
-fine — `make`'s own targets already call `uv run` internally); a bare
-`python -m ...` without `uv run` would hit the base image's system
-Python, which has none of the project's dependencies installed, since
-those live in the `uv`-managed `.venv`. (Caveat: this `Dockerfile` was
-written carefully against the project's real dependencies but hasn't been
-verified with an actual `docker build` — Docker wasn't available in the
-environment this was developed in.)
+The image builds and the services run — `docker build` passes with **329
+tests green inside the container**, and `docker compose run --rm demo` and
+`... eval` were both executed end to end. Building it for real immediately
+found two bugs that no amount of reading would have:
+
+1. **`opencv-python` doesn't import in a slim image.** Every cv2-importing
+   test failed collection with `ImportError: libGL.so.1: cannot open shared
+   object file`. The default OpenCV wheel links a GUI stack this project
+   never calls into (no `imshow`, no `waitKey` anywhere — only `warpAffine`,
+   morphology, connected components). Fixed by switching the dependency to
+   `opencv-python-headless`, which is the correct wheel for a non-GUI
+   consumer, rather than installing ~100MB of X11/mesa to satisfy a symbol.
+2. **A YAML folded scalar silently split one command into four.** The
+   `demo` service used `command: >` with indented continuation lines; `>`
+   only folds newlines between lines at the *same* indentation, so the
+   deeper-indented arguments kept their newlines and the shell ran
+   `--a ...` as its own command (`sh: 2: --a: not found`). Now an explicit
+   single-line exec-form list.
+
+**A determinism result worth recording**, from comparing the container run
+against the host run (macOS/arm64 vs linux/amd64):
+
+- **L0 (native, deterministic) is identical** — `P=0.82 R=0.86 F1=0.84
+  (tp=37 fp=8 fn=6)` on both, and `docker compose run --rm demo` produces a
+  byte-identical `delta_report.md` to `make run` on the host.
+- **L2 (scanned) is not** — `fp=217` on the host vs `fp=226` in the
+  container. The OCR path depends on the platform's `tesseract` build, so
+  the reproducibility guarantee holds precisely where the design claims it
+  (the symbolic engine) and not in the OCR front end. Worth knowing before
+  anyone treats an L2 number as a fixed baseline.
 
 ## Eval scorecard (current)
 
