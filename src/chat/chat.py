@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from src.chat.citations import ParsedCitation, format_citation, parse_citations, validate_citations
-from src.chat.llm import MODEL, get_client
+from src.chat.llm import get_client, get_model
 from src.chat.retrieval import BM25Index, Chunk
 from src.observability.tracer import Tracer
 
@@ -80,8 +80,9 @@ class LLMResult:
 
 def _default_call_llm(system: str, user: str) -> LLMResult:
     client = get_client()
+    model = get_model()
     resp = client.messages.create(
-        model=MODEL, max_tokens=MAX_TOKENS, system=system,
+        model=model, max_tokens=MAX_TOKENS, system=system,
         messages=[{"role": "user", "content": user}],
     )
     text = next((b.text for b in resp.content if b.type == "text"), "")
@@ -126,7 +127,7 @@ def answer(
     user_message = f"Context:\n{context}\n\nQuestion: {question}"
     llm_call = call_llm or _default_call_llm
 
-    with (tracer.llm_span("chat_answer", model=MODEL) if tracer else nullcontext(None)) as s:
+    with (tracer.llm_span("chat_answer", model=get_model()) if tracer else nullcontext(None)) as s:
         raw = llm_call(SYSTEM_PROMPT, user_message)
         result_obj = raw if isinstance(raw, LLMResult) else LLMResult(text=raw)
         response_text = result_obj.text

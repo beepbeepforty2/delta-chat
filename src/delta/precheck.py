@@ -83,13 +83,13 @@ def check_same_document(doc_a: CanonicalDocument, doc_b: CanonicalDocument) -> P
     drawno_a, drawno_b = _find_drawno(doc_a), _find_drawno(doc_b)
     equip_a, equip_b = _find_equipment_tag(doc_a), _find_equipment_tag(doc_b)
 
-    if drawno_a and drawno_b:
+    if drawno_a is not None and drawno_b is not None:
         if drawno_a == drawno_b:
             return PrecheckResult(True, "drawing numbers match", drawno_a, drawno_b, equip_a, equip_b)
         return PrecheckResult(False, f"drawing numbers differ: {drawno_a!r} vs {drawno_b!r}",
                                drawno_a, drawno_b, equip_a, equip_b)
 
-    if equip_a and equip_b:
+    if equip_a is not None and equip_b is not None:
         if equip_a == equip_b:
             return PrecheckResult(True, "equipment tags match", drawno_a, drawno_b, equip_a, equip_b)
         return PrecheckResult(False, f"equipment tags differ: {equip_a!r} vs {equip_b!r}",

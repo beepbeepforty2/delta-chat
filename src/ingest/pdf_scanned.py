@@ -59,7 +59,15 @@ def _ocr_words(img: Image.Image) -> list[dict]:
     words = []
     for i in range(len(data["text"])):
         text = data["text"][i].strip()
-        conf = int(data["conf"][i])
+        # tesseract returns conf as a string (e.g. "95" or "-1" for no
+        # confidence); some versions also emit "" for non-text entries, which
+        # int() would reject with ValueError. Coerce defensively and skip the
+        # word on any non-numeric value rather than aborting OCR of the page.
+        raw_conf = data["conf"][i]
+        try:
+            conf = int(raw_conf)
+        except (TypeError, ValueError):
+            continue
         if not text or conf < MIN_OCR_CONF:
             continue
         left, top = data["left"][i], data["top"][i]
@@ -171,33 +179,37 @@ class PdfScannedAdapter(FormatAdapter):
             return False
         try:
             doc = fitz.open(path)
-            if doc.page_count == 0:
-                return False
-            n_words = len(doc[0].get_text("text").split())
-            doc.close()
-            return n_words < NATIVE_MIN_TEXT_WORDS
+            try:
+                if doc.page_count == 0:
+                    return False
+                n_words = len(doc[0].get_text("text").split())
+                return n_words < NATIVE_MIN_TEXT_WORDS
+            finally:
+                doc.close()
         except Exception:
             return False
 
     def ingest(self, pid: str, path: str) -> CanonicalDocument:
         doc = fitz.open(path)
-        sheets = []
-        raster_paths: dict[int, str] = {}
-        os.makedirs(RASTER_CACHE_DIR, exist_ok=True)
-        for i, page in enumerate(doc):
-            sheet_no = i + 1
-            img = _page_image(page)
-            out_path = os.path.join(RASTER_CACHE_DIR, f"{pid}_sheet{sheet_no}.png")
-            img.save(out_path)
-            raster_paths[sheet_no] = out_path
+        try:
+            sheets = []
+            raster_paths: dict[int, str] = {}
+            os.makedirs(RASTER_CACHE_DIR, exist_ok=True)
+            for i, page in enumerate(doc):
+                sheet_no = i + 1
+                img = _page_image(page)
+                out_path = os.path.join(RASTER_CACHE_DIR, f"{pid}_sheet{sheet_no}.png")
+                img.save(out_path)
+                raster_paths[sheet_no] = out_path
 
-            elements = _text_elements(img, sheet_no)
-            sheets.append(CanonicalSheet(
-                number=sheet_no, width=float(img.width), height=float(img.height),
-                elements=elements,
-            ))
-        revision_label = _revision_label(sheets[0].elements) if sheets else None
-        doc.close()
+                elements = _text_elements(img, sheet_no)
+                sheets.append(CanonicalSheet(
+                    number=sheet_no, width=float(img.width), height=float(img.height),
+                    elements=elements,
+                ))
+            revision_label = _revision_label(sheets[0].elements) if sheets else None
+        finally:
+            doc.close()
         return CanonicalDocument(
             pid=pid, source_format="pdf_scanned", revision_label=revision_label,
             sheets=sheets, raster_paths=raster_paths,

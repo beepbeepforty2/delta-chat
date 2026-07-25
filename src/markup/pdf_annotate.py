@@ -111,17 +111,19 @@ def _annotate_visual_change(page: fitz.Page, d: Delta) -> None:
 def _annotate_document(pdf_path: str, boxes_by_sheet: dict[int, list], visual_changes_by_sheet: dict[int, list],
                         out_path: Path) -> str:
     doc = fitz.open(pdf_path)
-    all_sheets = set(boxes_by_sheet) | set(visual_changes_by_sheet)
-    for sheet_no in all_sheets:
-        page_index = sheet_no - 1  # sheet numbers are 1-indexed, page order matches (see pdf_native.py::ingest)
-        if not (0 <= page_index < doc.page_count):
-            continue
-        page = doc[page_index]
-        _annotate_page(page, boxes_by_sheet.get(sheet_no, []))
-        for d in visual_changes_by_sheet.get(sheet_no, []):
-            _annotate_visual_change(page, d)
-    doc.save(str(out_path), garbage=4, deflate=True)
-    doc.close()
+    try:
+        all_sheets = set(boxes_by_sheet) | set(visual_changes_by_sheet)
+        for sheet_no in all_sheets:
+            page_index = sheet_no - 1  # sheet numbers are 1-indexed, page order matches (see pdf_native.py::ingest)
+            if not (0 <= page_index < doc.page_count):
+                continue
+            page = doc[page_index]
+            _annotate_page(page, boxes_by_sheet.get(sheet_no, []))
+            for d in visual_changes_by_sheet.get(sheet_no, []):
+                _annotate_visual_change(page, d)
+        doc.save(str(out_path), garbage=4, deflate=True)
+    finally:
+        doc.close()
     return str(out_path)
 
 

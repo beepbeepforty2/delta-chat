@@ -12,7 +12,7 @@ import pytest
 from generator.content import make_sheet
 from generator.render import render_pdf, degrade
 from src.canonical.model import BBox, CanonicalElement
-from src.ingest.pdf_native import PdfNativeAdapter, _stack_instrument_bubbles
+from src.ingest.pdf_native import PdfNativeAdapter, _extract_spans, _stack_instrument_bubbles
 
 
 @pytest.fixture(scope="module")
@@ -230,3 +230,58 @@ def test_single_line_synthetic_format_unaffected_by_bubble_stacking(doc_std, she
                  if e.type == "instrument" and e.attrs.get("loop") == gt_inst.attrs["loop"])
     assert match.attrs["func"] == gt_inst.attrs["func"]
     assert match.attrs["system"] == gt_inst.attrs["system"]
+
+
+# --------------------------------------------------------------------- robustness
+
+
+class _FakePage:
+    """A minimal stand-in for a fitz Page whose get_text('dict') returns an
+    arbitrarily malformed structure -- the kind real CAD-to-PDF pipelines
+    occasionally emit (text blocks missing the 'lines' key, lines missing
+    'spans', spans missing 'text')."""
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def get_text(self, mode):
+        if mode != "dict":
+            raise AssertionError(f"_FakePage only supports 'dict', got {mode!r}")
+        return self._payload
+
+    def get_drawings(self):
+        return []
+
+
+def test_extract_spans_skips_malformed_block_missing_lines():
+    """Regression: a text block missing the 'lines' sub-key used to raise
+    KeyError and abort ingestion of the whole sheet. Now it is skipped."""
+    payload = {"blocks": [
+        {"type": 0, "bbox": (0, 0, 100, 10)},  # text block, no "lines" key
+        {"type": 0, "bbox": (0, 0, 100, 10), "lines": [
+            {"bbox": (0, 0, 50, 10), "spans": [  # well-formed line
+                {"text": "hello", "bbox": (0, 0, 50, 10), "origin": (0, 8), "size": 10},
+            ]},
+            {"bbox": (0, 0, 50, 10)},  # line missing "spans"
+        ]},
+        {"type": 1, "bbox": (0, 0, 10, 10)},  # image block, must be skipped
+    ]}
+    spans = _extract_spans(_FakePage(payload))
+    assert len(spans) == 1
+    assert spans[0]["text"] == "hello"
+
+
+def test_extract_spans_skips_span_missing_text_key():
+    """A span without a 'text' key (degenerate but observed in the wild) must
+    be skipped, not crash."""
+    payload = {"blocks": [
+        {"type": 0, "lines": [
+            {"spans": [
+                {"bbox": (0, 0, 50, 10), "origin": (0, 8), "size": 10},  # no "text"
+                {"text": "", "bbox": (0, 0, 50, 10), "origin": (0, 8), "size": 10},  # empty
+                {"text": "kept", "bbox": (0, 0, 50, 10), "origin": (0, 8), "size": 10},
+            ]},
+        ]},
+    ]}
+    spans = _extract_spans(_FakePage(payload))
+    assert [s["text"] for s in spans] == ["kept"]

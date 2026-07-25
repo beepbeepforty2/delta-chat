@@ -7,7 +7,8 @@ import pathlib
 
 import pytest
 
-from src.ingest.pdf_scanned import PdfScannedAdapter
+from src.ingest import pdf_scanned as pdf_scanned_mod
+from src.ingest.pdf_scanned import PdfScannedAdapter, _ocr_words
 from src.ingest.pdf_native import PdfNativeAdapter
 
 PAIRS_DIR = pathlib.Path(__file__).parent.parent / "eval" / "datasets" / "v0" / "pairs"
@@ -106,3 +107,37 @@ def test_recall_does_not_collapse_from_l1_to_l3(doc_l1, doc_l3):
 def test_no_geometry_elements_extracted(doc_l1):
     """Documented cut: no CV-based line/circle detection from the raster."""
     assert not any(e.type == "geometry" for e in doc_l1.sheets[0].elements)
+
+
+# --------------------------------------------------------------- OCR robustness
+
+
+def test_ocr_words_skips_non_numeric_confidence(monkeypatch):
+    """Regression: int(data['conf'][i]) used to crash with ValueError when
+    tesseract emitted an empty-string confidence (observed on some versions
+    for non-text entries). Now such entries are skipped, not fatal.
+
+    Monkeypatches pytesseract.image_to_data to return a controlled dict so the
+    test does not depend on a real tesseract run."""
+    from PIL import Image
+
+    fake_data = {
+        "text": ["good", "", "also", "bad"],
+        "conf": ["95", "-1", "80", ""],   # last entry is the malformed one
+        "left": [10, 20, 30, 40],
+        "top": [10, 20, 30, 40],
+        "width": [20, 20, 20, 20],
+        "height": [10, 10, 10, 10],
+    }
+    monkeypatch.setattr(pdf_scanned_mod.pytesseract, "image_to_data",
+                        lambda img, output_type=None: fake_data)
+
+    img = Image.new("RGB", (100, 100))
+    words = _ocr_words(img)
+    # "good" (conf 95) and "also" (conf 80) survive; "" is empty-text (skipped
+    # by the empty guard), "-1" conf below threshold (skipped), "" conf is
+    # non-numeric (skipped by the new guard, previously crashed).
+    texts = [w["text"] for w in words]
+    assert "good" in texts
+    assert "also" in texts
+    assert len(words) == 2

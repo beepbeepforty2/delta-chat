@@ -90,7 +90,15 @@ def _umeyama(src: np.ndarray, dst: np.ndarray) -> Transform:
 
     cov = (dst_c.T @ src_c) / len(src)
     u, s, vt = np.linalg.svd(cov)
-    d = np.sign(np.linalg.det(u @ vt)) or 1.0
+    # Reflection correction (Umeyama/Kabsch): if det(U @ V^T) < 0 the SVD
+    # found a reflected solution, so flip the sign of the last singular
+    # vector. The degenerate det == 0 case is reflection-ambiguous; pick
+    # d = +1 (no flip) as a stable arbitrary choice. Written explicitly
+    # rather than as ``np.sign(...) or 1.0`` to avoid relying on numpy
+    # scalar falsiness, which is easy to misread and brittle if this is
+    # ever vectorized.
+    det = float(np.linalg.det(u @ vt))
+    d = 1.0 if det >= 0 else -1.0
     sign_fix = np.diag([1.0, d])
     r = u @ sign_fix @ vt
     scale = float(np.trace(np.diag(s) @ sign_fix) / var_src)

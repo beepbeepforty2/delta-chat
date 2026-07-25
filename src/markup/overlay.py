@@ -143,7 +143,8 @@ def _collect_visual_change_boxes(deltas: list[Delta]) -> dict[int, list[Delta]]:
 
 
 def _annotate(raster_path: str, entries: list, visual_changes: list[Delta], legend: bool) -> Image.Image:
-    base = Image.open(raster_path).convert("RGBA")
+    with Image.open(raster_path) as src:
+        base = src.convert("RGBA")
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay, "RGBA")
     for el, d in entries:

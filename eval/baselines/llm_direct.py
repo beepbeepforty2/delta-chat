@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from src.canonical.model import CanonicalDocument
-from src.chat.llm import MODEL, get_client
+from src.chat.llm import get_client, get_model
 from src.delta.model import Delta
 
 SYSTEM_PROMPT = """You are comparing two revisions (A and B) of a P&ID \
@@ -106,7 +106,7 @@ def _parse_deltas(raw_text: str) -> list[Delta]:
 
 def _default_call_llm(system: str, user: str, temperature: Optional[float]) -> str:
     client = get_client()
-    kwargs = {"model": MODEL, "max_tokens": 4096, "system": system,
+    kwargs = {"model": get_model(), "max_tokens": 4096, "system": system,
               "messages": [{"role": "user", "content": user}]}
     if temperature is not None:
         kwargs["temperature"] = temperature

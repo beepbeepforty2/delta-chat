@@ -29,8 +29,25 @@ from dotenv import load_dotenv
 
 load_dotenv()  # no-op if .env is absent or vars are already set in the environment
 
-MODEL = os.environ.get("LLM_MODEL", "claude-sonnet-5")
-JUDGE_MODEL = os.environ.get("JUDGE_MODEL", MODEL)
+# Model names are read fresh on each call (get_model / get_judge_model below),
+# NOT cached at import time, so tests can monkeypatch LLM_MODEL / JUDGE_MODEL
+# in os.environ without a module reload -- the same principle _estimate_cost
+# in chat.py applies to cost rates. Reading them once into module constants
+# here would freeze the value at first import and silently ignore later env
+# changes, which is exactly the inconsistency this refactor removes.
+DEFAULT_MODEL = "claude-sonnet-5"
+
+
+def get_model() -> str:
+    """Chat/backend model name, read fresh each call (env: LLM_MODEL)."""
+    return os.environ.get("LLM_MODEL", DEFAULT_MODEL)
+
+
+def get_judge_model() -> str:
+    """Judge model name, read fresh each call. Defaults to the chat model
+    when JUDGE_MODEL is unset, preserving the documented same-backend default
+    that judge_is_same_backend() relies on."""
+    return os.environ.get("JUDGE_MODEL", get_model())
 
 
 def _client_from_env(base_url: str | None, auth_token: str | None, api_key: str | None) -> anthropic.Anthropic:

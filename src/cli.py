@@ -43,6 +43,49 @@ def _resolve_with_pid(pid: str, path: str) -> CanonicalDocument:
     raise ValueError(f"no adapter claims {path}")
 
 
+def _run_pipeline(args: argparse.Namespace, tracer: Tracer,
+                  verbose_refusal: bool = False
+                  ) -> tuple[CanonicalDocument, CanonicalDocument, list[Delta]] | int:
+    """Shared ingest -> precheck -> compute_deltas driver used by cmd_run /
+    cmd_chat / cmd_markup. Must be called INSIDE the caller's already-open
+    "request" span so the report/build_index/markup spans remain children of
+    request (test_cli_run.py asserts that nesting). Returns the resolved
+    (doc_a, doc_b, deltas) triple on success, or an int exit code (1) when
+    precheck refuses the pair -- in which case the REFUSED line has already
+    been printed to stderr and the caller should return that code unchanged.
+
+    ``verbose_refusal`` controls whether the A/B drawno+equipment detail lines
+    follow the REFUSED message: cmd_run prints them (operators want the
+    diagnostic), cmd_chat/cmd_markup do not (the interactive/quick paths keep
+    refusal output to one line). Centralizing the rest avoids the three-way
+    duplication that previously meant a change to the ingest/precheck spans
+    had to be made in three places and could silently diverge."""
+    with tracer.span("ingest"):
+        with tracer.span("ingest_a", path=args.a) as s:
+            doc_a = _resolve_with_pid("A", args.a)
+            s.set("n_elements", sum(len(sh.elements) for sh in doc_a.sheets))
+        with tracer.span("ingest_b", path=args.b) as s:
+            doc_b = _resolve_with_pid("B", args.b)
+            s.set("n_elements", sum(len(sh.elements) for sh in doc_b.sheets))
+
+    with tracer.span("precheck") as s:
+        precheck = check_same_document(doc_a, doc_b)
+        s.set("is_pair", precheck.is_pair)
+        s.set("reason", precheck.reason)
+
+    if not precheck.is_pair:
+        print(f"REFUSED: {precheck.reason}", file=sys.stderr)
+        if verbose_refusal:
+            print(f"  A: drawno={precheck.drawing_no_a!r} equipment={precheck.equipment_a!r}", file=sys.stderr)
+            print(f"  B: drawno={precheck.drawing_no_b!r} equipment={precheck.equipment_b!r}", file=sys.stderr)
+        return 1
+    if "no drawing number" in precheck.reason:
+        print(f"WARNING: {precheck.reason}", file=sys.stderr)
+
+    deltas = compute_deltas(doc_a, doc_b, tracer)
+    return doc_a, doc_b, deltas
+
+
 def compute_deltas(doc_a: CanonicalDocument, doc_b: CanonicalDocument, tracer: Tracer,
                     semantic_null_call_llm=None) -> list[Delta]:
     with tracer.span("register") as s:
@@ -127,28 +170,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     tracer = Tracer()
     try:
         with tracer.span("request", pid_a=args.a, pid_b=args.b):
-            with tracer.span("ingest"):
-                with tracer.span("ingest_a", path=args.a) as s:
-                    doc_a = _resolve_with_pid("A", args.a)
-                    s.set("n_elements", sum(len(sh.elements) for sh in doc_a.sheets))
-                with tracer.span("ingest_b", path=args.b) as s:
-                    doc_b = _resolve_with_pid("B", args.b)
-                    s.set("n_elements", sum(len(sh.elements) for sh in doc_b.sheets))
-
-            with tracer.span("precheck") as s:
-                precheck = check_same_document(doc_a, doc_b)
-                s.set("is_pair", precheck.is_pair)
-                s.set("reason", precheck.reason)
-
-            if not precheck.is_pair:
-                print(f"REFUSED: {precheck.reason}", file=sys.stderr)
-                print(f"  A: drawno={precheck.drawing_no_a!r} equipment={precheck.equipment_a!r}", file=sys.stderr)
-                print(f"  B: drawno={precheck.drawing_no_b!r} equipment={precheck.equipment_b!r}", file=sys.stderr)
-                return 1
-            if "no drawing number" in precheck.reason:
-                print(f"WARNING: {precheck.reason}", file=sys.stderr)
-
-            deltas = compute_deltas(doc_a, doc_b, tracer)
+            outcome = _run_pipeline(args, tracer, verbose_refusal=True)
+            if isinstance(outcome, int):
+                return outcome
+            doc_a, doc_b, deltas = outcome
 
             with tracer.span("report") as s:
                 json_path, md_path = write_report(deltas, args.a, args.b, args.out)
@@ -199,24 +224,10 @@ def cmd_chat(args: argparse.Namespace) -> int:
     tracer = Tracer()
     try:
         with tracer.span("request", pid_a=args.a, pid_b=args.b, mode="chat"):
-            with tracer.span("ingest"):
-                with tracer.span("ingest_a", path=args.a) as s:
-                    doc_a = _resolve_with_pid("A", args.a)
-                    s.set("n_elements", sum(len(sh.elements) for sh in doc_a.sheets))
-                with tracer.span("ingest_b", path=args.b) as s:
-                    doc_b = _resolve_with_pid("B", args.b)
-                    s.set("n_elements", sum(len(sh.elements) for sh in doc_b.sheets))
-
-            with tracer.span("precheck") as s:
-                precheck = check_same_document(doc_a, doc_b)
-                s.set("is_pair", precheck.is_pair)
-                s.set("reason", precheck.reason)
-
-            if not precheck.is_pair:
-                print(f"REFUSED: {precheck.reason}", file=sys.stderr)
-                return 1
-
-            deltas = compute_deltas(doc_a, doc_b, tracer)
+            outcome = _run_pipeline(args, tracer)
+            if isinstance(outcome, int):
+                return outcome
+            doc_a, doc_b, deltas = outcome
 
             with tracer.span("build_index") as s:
                 chunks = build_chunks(doc_a, doc_b, deltas)
@@ -245,24 +256,10 @@ def cmd_markup(args: argparse.Namespace) -> int:
     tracer = Tracer()
     try:
         with tracer.span("request", pid_a=args.a, pid_b=args.b, mode="markup"):
-            with tracer.span("ingest"):
-                with tracer.span("ingest_a", path=args.a) as s:
-                    doc_a = _resolve_with_pid("A", args.a)
-                    s.set("n_elements", sum(len(sh.elements) for sh in doc_a.sheets))
-                with tracer.span("ingest_b", path=args.b) as s:
-                    doc_b = _resolve_with_pid("B", args.b)
-                    s.set("n_elements", sum(len(sh.elements) for sh in doc_b.sheets))
-
-            with tracer.span("precheck") as s:
-                precheck = check_same_document(doc_a, doc_b)
-                s.set("is_pair", precheck.is_pair)
-                s.set("reason", precheck.reason)
-
-            if not precheck.is_pair:
-                print(f"REFUSED: {precheck.reason}", file=sys.stderr)
-                return 1
-
-            deltas = compute_deltas(doc_a, doc_b, tracer)
+            outcome = _run_pipeline(args, tracer)
+            if isinstance(outcome, int):
+                return outcome
+            doc_a, doc_b, deltas = outcome
 
             with tracer.span("markup", format=args.format) as s:
                 if args.format == "png":

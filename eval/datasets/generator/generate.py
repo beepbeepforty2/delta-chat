@@ -105,10 +105,13 @@ def validate_render_fidelity(sheet: Sheet, pdf_path: str) -> None:
     """Guard 2: every model text element must appear in the L0 text layer."""
     import fitz
     doc = fitz.open(pdf_path)
-    page_text = doc[0].get_text()
-    missing = [el.eid for el in sheet.elements.values()
-               if el.text and el.text.split(" ")[0] not in page_text]
-    assert not missing, f"render dropped elements: {missing[:5]}"
+    try:
+        page_text = doc[0].get_text()
+        missing = [el.eid for el in sheet.elements.values()
+                   if el.text and el.text.split(" ")[0] not in page_text]
+        assert not missing, f"render dropped elements: {missing[:5]}"
+    finally:
+        doc.close()
 
 
 def canary_score(a: Sheet, b: Sheet, deltas) -> float:

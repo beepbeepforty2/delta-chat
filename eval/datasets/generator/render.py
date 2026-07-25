@@ -130,9 +130,13 @@ def degrade(pdf_path: str, out_pdf: str, level: int, seed: int) -> dict:
     # scans but too slow for iterating; bump via DPI_LADDER if needed.
     dpi = {1: 200, 2: 150, 3: 120}[level]
     doc = fitz.open(pdf_path)
-    page = doc[0]
-    pix = page.get_pixmap(dpi=dpi)
-    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    try:
+        page = doc[0]
+        pix = page.get_pixmap(dpi=dpi)
+        img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+        page_rect = page.rect
+    finally:
+        doc.close()
     transform = {"level": level, "dpi": dpi, "skew_deg": 0.0, "jpeg_q": None,
                  "noise_sigma": 0.0, "blur_px": 0.0}
     if level >= 2:
@@ -153,12 +157,15 @@ def degrade(pdf_path: str, out_pdf: str, level: int, seed: int) -> dict:
         transform["blur_px"] = round(blur, 2)
         img = img.filter(ImageFilter.GaussianBlur(blur))
     out = fitz.open()
-    w_pt, h_pt = page.rect.width, page.rect.height
-    p = out.new_page(width=w_pt, height=h_pt)
-    buf = io.BytesIO()
-    img.save(buf, "JPEG", quality=85)
-    p.insert_image(p.rect, stream=buf.getvalue())
-    out.save(out_pdf)
+    try:
+        w_pt, h_pt = page_rect.width, page_rect.height
+        p = out.new_page(width=w_pt, height=h_pt)
+        buf = io.BytesIO()
+        img.save(buf, "JPEG", quality=85)
+        p.insert_image(p.rect, stream=buf.getvalue())
+        out.save(out_pdf)
+    finally:
+        out.close()
     return transform
 
 

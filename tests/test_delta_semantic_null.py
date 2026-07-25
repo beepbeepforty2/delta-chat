@@ -3,6 +3,7 @@ import pathlib
 import pytest
 
 from src.delta.model import Delta
+from src.delta import semantic_null as sn
 from src.delta.semantic_null import adjudicate_semantic_null, annotate_semantic_null, clear_cache
 
 PAIRS_DIR = pathlib.Path(__file__).parent.parent / "eval" / "datasets" / "v0" / "pairs"
@@ -164,3 +165,42 @@ def test_real_null_reword_pair_gets_semantic_null_flagged(monkeypatch):
     deltas = compute_deltas(doc_a, doc_b, tracer, semantic_null_call_llm=fake_llm)
     tracer.finish()
     assert any(d.semantic_null for d in deltas)
+
+
+def test_cache_is_bounded_and_evicts_oldest_beyond_cap(monkeypatch):
+    """Regression: the module-global _cache used to be an unbounded dict --
+    fine for a single CLI run, but an unbounded leak keyed on user content
+    for any long-lived process (batch job, future server refactor). The cache
+    must now cap at _CACHE_MAX and evict the oldest entry (FIFO) past it.
+
+    We temporarily lower _CACHE_MAX so the test runs in reasonable time; the
+    eviction logic itself is what's under test, not the specific bound."""
+    clear_cache()
+    monkeypatch.setattr(sn, "_CACHE_MAX", 4)
+    monkeypatch.setenv("DELTA_SEMANTIC_NULL_LLM", "1")
+
+    def fake_llm(system, user):
+        return "VERDICT: REAL\ndistinct content"
+
+    # Fill past the cap; each key is a distinct (old, new) pair.
+    for i in range(10):
+        adjudicate_semantic_null(f"old-{i}", f"new-{i}", call_llm=fake_llm)
+
+    cache = sn._cache
+    assert len(cache) == 4, f"cache should be capped at _CACHE_MAX=4, got {len(cache)}"
+    # FIFO eviction: the surviving keys must be the most-recently inserted.
+    assert ("old-6", "new-6") in cache
+    assert ("old-9", "new-9") in cache
+    assert ("old-0", "new-0") not in cache  # evicted long ago
+    clear_cache()
+
+
+def test_cache_clear_still_empties_after_bounding(monkeypatch):
+    """clear_cache() (the test seam) must still empty the cache fully even
+    after the bounding refactor -- several other tests rely on this."""
+    clear_cache()
+    monkeypatch.setenv("DELTA_SEMANTIC_NULL_LLM", "1")
+    adjudicate_semantic_null("a", "b", call_llm=lambda s, u: "VERDICT: REAL\nx")
+    assert len(sn._cache) == 1
+    clear_cache()
+    assert len(sn._cache) == 0

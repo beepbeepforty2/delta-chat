@@ -130,11 +130,11 @@ def _default_judge_call_llm(system: str, user: str) -> str:
     the same backend today (see src/chat/llm.py::judge_is_same_backend).
     Keeping the call path separate means a real second credential is a
     one-line .env change, not a code change."""
-    from src.chat.llm import JUDGE_MODEL, get_judge_client
+    from src.chat.llm import get_judge_client, get_judge_model
 
     client = get_judge_client()
     resp = client.messages.create(
-        model=JUDGE_MODEL, max_tokens=JUDGE_MAX_TOKENS, system=system,
+        model=get_judge_model(), max_tokens=JUDGE_MAX_TOKENS, system=system,
         messages=[{"role": "user", "content": user}],
     )
     return next((b.text for b in resp.content if b.type == "text"), "")

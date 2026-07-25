@@ -57,9 +57,14 @@ def _extract_spans(page: "fitz.Page") -> list[dict]:
     for block in page.get_text("dict")["blocks"]:
         if block.get("type") != 0:  # skip image blocks
             continue
-        for line in block["lines"]:
-            for span in line["spans"]:
-                if span["text"] != "":
+        # Real CAD-to-PDF pipelines occasionally emit text blocks whose
+        # "lines"/"spans" sub-keys are absent or differently shaped; without
+        # these guards a single malformed block would raise KeyError and kill
+        # ingestion of the whole sheet. Skip the structurally-incomplete block
+        # rather than failing the document.
+        for line in block.get("lines", ()):
+            for span in line.get("spans", ()):
+                if span.get("text", "") != "":
                     spans.append(span)
     return spans
 
@@ -301,33 +306,37 @@ class PdfNativeAdapter(FormatAdapter):
             return False
         try:
             doc = fitz.open(path)
-            if doc.page_count == 0:
-                return False
-            n_words = len(doc[0].get_text("text").split())
-            doc.close()
-            return n_words >= MIN_TEXT_WORDS
+            try:
+                if doc.page_count == 0:
+                    return False
+                n_words = len(doc[0].get_text("text").split())
+                return n_words >= MIN_TEXT_WORDS
+            finally:
+                doc.close()
         except Exception:
             return False
 
     def ingest(self, pid: str, path: str) -> CanonicalDocument:
         doc = fitz.open(path)
-        sheets = []
-        all_elements_by_sheet: dict[int, list[CanonicalElement]] = {}
-        for i, page in enumerate(doc):
-            sheet_no = i + 1
-            text_els = _text_elements(page, sheet_no)
-            geom_els = _geometry_elements(page, sheet_no)
-            circles = [el for el in geom_els if el.attrs.get("geom_kind") == "circle"]
-            text_els = _stack_instrument_bubbles(text_els, circles, sheet_no)
-            elements = text_els + geom_els
-            all_elements_by_sheet[sheet_no] = elements
-            sheets.append(CanonicalSheet(
-                number=sheet_no, width=page.rect.width, height=page.rect.height,
-                elements=elements,
-            ))
-        raster_paths = _rasterize(doc, pid)
-        revision_label = _revision_label(sheets[0].elements) if sheets else None
-        doc.close()
+        try:
+            sheets = []
+            all_elements_by_sheet: dict[int, list[CanonicalElement]] = {}
+            for i, page in enumerate(doc):
+                sheet_no = i + 1
+                text_els = _text_elements(page, sheet_no)
+                geom_els = _geometry_elements(page, sheet_no)
+                circles = [el for el in geom_els if el.attrs.get("geom_kind") == "circle"]
+                text_els = _stack_instrument_bubbles(text_els, circles, sheet_no)
+                elements = text_els + geom_els
+                all_elements_by_sheet[sheet_no] = elements
+                sheets.append(CanonicalSheet(
+                    number=sheet_no, width=page.rect.width, height=page.rect.height,
+                    elements=elements,
+                ))
+            raster_paths = _rasterize(doc, pid)
+            revision_label = _revision_label(sheets[0].elements) if sheets else None
+        finally:
+            doc.close()
         return CanonicalDocument(
             pid=pid, source_format="pdf_native", revision_label=revision_label,
             sheets=sheets, raster_paths=raster_paths,

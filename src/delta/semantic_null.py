@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections import OrderedDict
 from typing import Callable, Optional
 
 from src.delta.model import Delta
@@ -89,13 +90,21 @@ with a one-sentence reason on the next line."""
 
 _VERDICT_RE = re.compile(r"VERDICT:\s*(NULL|REAL)", re.IGNORECASE)
 
-_cache: dict[tuple[str, str], tuple[bool, str]] = {}
+# Process-global LLM verdict cache, keyed by (old, new) content pair -- per
+# decision #3(c), "isolated, cached ... within and across eval runs on the
+# same process" to avoid repeat calls for identical pairs. Bounded by an
+# OrderedDict with FIFO eviction so a long-lived process (batch job, future
+# server refactor) cannot grow this without limit on user content. The bound
+# is generous relative to the realistic working set (a single eval run touches
+# O(100s) of distinct pairs) so eviction never fires in normal use.
+_CACHE_MAX = 4096
+_cache: "OrderedDict[tuple[str, str], tuple[bool, str]]" = OrderedDict()
 
 
 def _default_call_llm(system: str, user: str) -> str:
-    from src.chat.llm import MODEL, get_client
+    from src.chat.llm import get_client, get_model
     client = get_client()
-    resp = client.messages.create(model=MODEL, max_tokens=150, system=system,
+    resp = client.messages.create(model=get_model(), max_tokens=150, system=system,
                                    messages=[{"role": "user", "content": user}])
     return next((b.text for b in resp.content if b.type == "text"), "")
 
@@ -119,6 +128,12 @@ def adjudicate_semantic_null(old_content: str, new_content: str,
         reason = raw[match.end():].strip().lstrip(":").strip() or raw
         result = (match.group(1).upper() == "NULL", reason)
     _cache[key] = result
+    # FIFO eviction: OrderedDict preserves insertion order, so popitem(last=
+    # False) removes the oldest entry once over capacity. Keeps the cache
+    # bounded without disturbing the hot path (eviction only fires past the
+    # generous _CACHE_MAX, which normal use never reaches).
+    while len(_cache) > _CACHE_MAX:
+        _cache.popitem(last=False)
     return result
 
 

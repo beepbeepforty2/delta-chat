@@ -95,3 +95,44 @@ def test_no_comparable_content_at_all_still_fails_open():
     result = check_same_document(doc_a, doc_b)
     assert result.is_pair is True
     assert "proceeding without identity confirmation" in result.reason
+
+
+def _drawno_el(value):
+    """A title_field element carrying a drawno value (possibly empty string)."""
+    return CanonicalElement(
+        id="drawno", type="title_field", content=str(value),
+        bbox=BBox(0.1, 0.1, 0.2, 0.11), sheet=1, zone="A-1",
+        extraction_confidence=1.0, attrs={"field": "drawno", "value": value},
+    )
+
+
+def _doc_with_drawno(pid, drawno_value):
+    """A doc whose only title-block signal is a (possibly empty) drawno."""
+    els = [_drawno_el(drawno_value), _tag_el("e0", "26-L-1001")]
+    return CanonicalDocument(pid=pid, source_format="pdf_native", revision_label=None,
+                             sheets=[CanonicalSheet(number=1, width=1.0, height=1.0, elements=els)])
+
+
+def test_empty_string_drawno_on_both_sides_matches_as_pair():
+    """Regression: the old ``if drawno_a and drawno_b`` truthiness check treated
+    an empty-string drawno (a real extraction artifact from a malformed title
+    block) as 'absent', silently downgrading to a weaker tier. With ``is not
+    None``, two empty-string drawno values match as equal and the pair is
+    accepted at the drawno tier itself."""
+    doc_a = _doc_with_drawno("a", "")
+    doc_b = _doc_with_drawno("b", "")
+    result = check_same_document(doc_a, doc_b)
+    assert result.is_pair is True
+    assert result.reason == "drawing numbers match"
+
+
+def test_empty_string_drawno_on_one_side_real_on_other_is_refused():
+    """Empty string on one side, real value on the other: they differ, so the
+    pair must be refused at the drawno tier (not silently fall through to
+    equipment tags or tag-overlap)."""
+    doc_a = _doc_with_drawno("a", "")
+    doc_b = _doc_with_drawno("b", "DWG-1234")
+    result = check_same_document(doc_a, doc_b)
+    assert result.is_pair is False
+    assert "drawing numbers differ" in result.reason
+    assert "''" in result.reason and "DWG-1234" in result.reason
