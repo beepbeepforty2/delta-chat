@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>delta-chat — P&amp;ID revision comparison</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="titlewrap">
+    <div class="eyebrow">delta-chat</div>
+    <h1 id="pair-title">Compare two revisions of a P&amp;ID</h1>
+    <div class="subtitle" id="pair-subtitle">Select revision A and revision B, then analyse.</div>
+  </div>
+  <div class="stats" id="stats" hidden></div>
+  <div class="topactions">
+    <button class="btn ghost" id="btn-theme" title="Toggle light / dark">◐</button>
+    <button class="btn ghost" id="btn-new" hidden>New comparison</button>
+  </div>
+</header>
+
+<!-- ────────────────────────────  landing  ──────────────────────────── -->
+<section id="landing" class="screen">
+  <div class="landing-inner">
+    <h2>Which two revisions?</h2>
+    <p class="lede">
+      Drop the earlier revision on the left and the later one on the right.
+      Both must be PDFs of the same drawing.
+    </p>
+
+    <div class="dropzones">
+      <label class="dropzone" data-side="a">
+        <input type="file" accept="application/pdf,.pdf" hidden>
+        <div class="dz-badge">A</div>
+        <div class="dz-title">Revision A</div>
+        <div class="dz-hint">the earlier drawing</div>
+        <div class="dz-file"></div>
+      </label>
+      <div class="dz-arrow" aria-hidden="true">→</div>
+      <label class="dropzone" data-side="b">
+        <input type="file" accept="application/pdf,.pdf" hidden>
+        <div class="dz-badge">B</div>
+        <div class="dz-title">Revision B</div>
+        <div class="dz-hint">the later drawing</div>
+        <div class="dz-file"></div>
+      </label>
+    </div>
+
+    <button class="btn primary big" id="btn-analyse" disabled>Analyse</button>
+    <div class="upload-error" id="upload-error" hidden></div>
+
+    <div class="samples" id="samples" hidden>
+      <div class="samples-label">or try a bundled vendor drawing</div>
+      <div class="samples-row" id="samples-row"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ────────────────────────────  progress  ─────────────────────────── -->
+<section id="progress" class="screen" hidden>
+  <div class="progress-inner">
+    <h2 id="progress-title">Comparing revisions</h2>
+    <ol class="stagelist" id="stagelist"></ol>
+    <div class="elapsed" id="elapsed"></div>
+  </div>
+</section>
+
+<!-- ────────────────────────────  refused  ──────────────────────────── -->
+<section id="refused" class="screen" hidden>
+  <div class="refusal-card">
+    <div class="refusal-icon">⚠</div>
+    <h2>These look like two different drawings</h2>
+    <p class="refusal-reason" id="refusal-reason"></p>
+    <table class="refusal-table">
+      <thead><tr><th></th><th>Revision A</th><th>Revision B</th></tr></thead>
+      <tbody>
+        <tr><th>Drawing number</th><td id="rf-drawno-a"></td><td id="rf-drawno-b"></td></tr>
+        <tr><th>Equipment tag</th><td id="rf-equip-a"></td><td id="rf-equip-b"></td></tr>
+      </tbody>
+    </table>
+    <p class="refusal-note">
+      Comparing unrelated drawings produces a report where nearly everything
+      looks changed, which is worse than no report. If you know these really
+      are two revisions of the same drawing — a renamed sheet, or a missing
+      title block — you can continue anyway.
+    </p>
+    <div class="refusal-actions">
+      <button class="btn ghost" id="btn-refusal-back">Choose different files</button>
+      <button class="btn warn" id="btn-force">Analyse anyway</button>
+    </div>
+  </div>
+</section>
+
+<!-- ────────────────────────────  error  ────────────────────────────── -->
+<section id="errored" class="screen" hidden>
+  <div class="refusal-card">
+    <div class="refusal-icon">✕</div>
+    <h2>That comparison failed</h2>
+    <p class="refusal-reason mono" id="error-message"></p>
+    <div class="refusal-actions">
+      <button class="btn ghost" id="btn-error-back">Choose different files</button>
+    </div>
+  </div>
+</section>
+
+<!-- ────────────────────────────  workspace  ────────────────────────── -->
+<main id="workspace" class="screen" hidden>
+
+  <div class="viewer">
+    <div class="viewer-toolbar">
+      <div class="sheettabs" id="sheettabs"></div>
+      <div class="spacer"></div>
+      <div class="zoomctl">
+        <button class="btn icon" id="zoom-out" title="Zoom out">−</button>
+        <span class="zoomlevel" id="zoomlevel">100%</span>
+        <button class="btn icon" id="zoom-in" title="Zoom in">+</button>
+        <button class="btn icon" id="zoom-fit" title="Fit to width">⤢</button>
+      </div>
+      <label class="chip" id="synctoggle">
+        <input type="checkbox" id="sync-panes" checked>
+        <span>Lock panes together</span>
+      </label>
+    </div>
+
+    <div class="panes">
+      <div class="pane" data-side="a">
+        <div class="pane-label"><span class="dot-a">A</span> <span id="label-a"></span></div>
+        <div class="pane-viewport">
+          <div class="page">
+            <canvas></canvas>
+            <div class="overlay"></div>
+          </div>
+          <div class="pane-empty" hidden>This sheet does not exist in revision A.</div>
+        </div>
+      </div>
+      <div class="pane" data-side="b">
+        <div class="pane-label"><span class="dot-b">B</span> <span id="label-b"></span></div>
+        <div class="pane-viewport">
+          <div class="page">
+            <canvas></canvas>
+            <div class="overlay"></div>
+          </div>
+          <div class="pane-empty" hidden>This sheet does not exist in revision B.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside>
+    <div class="tabbar">
+      <button class="tabbtn active" data-tab="changes">Changes <span class="tabcount" id="tabcount"></span></button>
+      <button class="tabbtn" data-tab="ask">Ask</button>
+      <button class="tabbtn" data-tab="json">Data</button>
+    </div>
+
+    <!-- changes -->
+    <section class="tabpanel active" data-tab="changes">
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Filter by description, tag or zone…">
+        <div class="chiprow" id="kindchips"></div>
+        <label class="chip">
+          <input type="checkbox" id="show-cascade">
+          <span>Show knock-on changes</span>
+        </label>
+      </div>
+      <div class="rows" id="rows"></div>
+      <div class="rowsfoot" id="rowsfoot"></div>
+    </section>
+
+    <!-- ask -->
+    <section class="tabpanel" data-tab="ask">
+      <!-- Contents are built by renderSuggestions() once a job is loaded, so
+           the suggested questions can be drawn from the actual findings. -->
+      <div class="chatlog" id="chatlog"></div>
+      <div class="chatbox" id="chatbox">
+        <textarea id="question" rows="2" placeholder="What changed in this revision?"></textarea>
+        <button class="btn primary" id="btn-ask">Ask</button>
+      </div>
+      <div class="chat-disabled" id="chat-disabled" hidden>
+        <strong>Chat needs a language-model credential.</strong>
+        Copy <code>.env.example</code> to <code>.env</code> and set
+        <code>LLM_AUTH_TOKEN</code> or <code>LLM_API_KEY</code>, then restart.
+        Everything else on this page works without one — change detection is
+        fully deterministic and never calls a model.
+      </div>
+    </section>
+
+    <!-- json -->
+    <section class="tabpanel" data-tab="json">
+      <div class="toolbar">
+        <div class="downloads" id="downloads"></div>
+        <button class="btn ghost small" id="btn-copy-json">Copy JSON</button>
+      </div>
+      <pre class="jsonview mono" id="jsonview"></pre>
+    </section>
+  </aside>
+</main>
+
+<div id="banners"></div>
+<div id="toast" hidden></div>
+
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

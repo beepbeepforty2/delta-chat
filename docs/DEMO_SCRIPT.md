@@ -22,7 +22,7 @@ brew install asciinema      # checked: `which asciinema` currently returns nothi
 cd ~/Code/delta-chat
 git status --short          # should be clean
 make dataset                # ~30s, ONE TIME — do NOT record this
-make test                   # confirm 339 green — do NOT record this
+make test                   # confirm 393 green — do NOT record this
 rm -rf reports/ traces/     # so the demo writes them fresh on camera
 ```
 

@@ -26,6 +26,9 @@ eval/results/
 raster_cache/
 reports/
 traces/
+# per-job uploads + artifacts from `make web`; the job store is in-process,
+# so anything left here is from a previous run and is safe to delete.
+.web_jobs/
 
 # os cruft
 .DS_Store

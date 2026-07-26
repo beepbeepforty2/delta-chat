@@ -19,8 +19,17 @@ dependencies = [
   # object file". headless drops that dependency entirely rather than
   # installing an X11/mesa stack we would never call into.
   "opencv-python-headless>=4.9", "scikit-image>=0.22",
+  # Web UI (src/web/). python-multipart is not optional despite looking like
+  # it: FastAPI raises at import time on any route declaring UploadFile
+  # without it installed, so the app would fail to start rather than fail on
+  # first upload. No jinja2 -- the frontend is static files, and the one
+  # templated artifact (report.html) predates this and does its own
+  # placeholder substitution.
+  "fastapi>=0.110", "uvicorn[standard]>=0.29", "python-multipart>=0.0.9",
 ]
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.4"]
+# httpx is what starlette's TestClient runs on -- dev-only, the server itself
+# never makes outbound HTTP.
+dev = ["pytest>=8", "ruff>=0.4", "httpx>=0.27"]
 [tool.setuptools.packages.find]
 where = ["src"]

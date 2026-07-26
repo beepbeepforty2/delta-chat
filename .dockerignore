@@ -17,6 +17,7 @@ eval/results/
 raster_cache/
 reports/
 traces/
+.web_jobs/
 
 # vcs / os cruft
 .git/

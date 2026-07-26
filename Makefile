@@ -1,6 +1,8 @@
-.PHONY: install dataset run html-report chat eval eval-holdout markup visual-diff trace test
+.PHONY: install dataset run html-report web chat eval eval-holdout markup visual-diff trace test
 install:
 	uv sync --extra dev
+web:                ## browser UI: pick two PDFs, see what changed, ask about it
+	uv run uvicorn src.web.app:app --host 127.0.0.1 --port 8000 --reload
 dataset:            ## generate labeled eval pairs (seeded, reproducible)
 	cd eval/datasets && uv run python -m generator.generate --out v0 --n 6 --seed 42
 run:                ## ingest a pair and produce a delta report

@@ -29,6 +29,14 @@ Or natively:
 make install
 ```
 
+**Prefer to click rather than read?** `make web` (or `docker compose up web`)
+serves the same pipeline as a browser UI at `http://127.0.0.1:8000` — the two
+drawings side by side with every change boxed on them, the change list, the
+chat, and the raw JSON in one page. Sections 1, 2 and 4 below are all visible
+there without typing a command; this document stays terminal-based because
+its purpose is to show captured, reproducible output. See
+[Web UI](README.md#web-ui).
+
 ---
 
 ## 1 — The delta

@@ -55,7 +55,9 @@ eval harness are first-class requirements, not extras. Depth over breadth.
 7. **Chat**: retrieval over PID A + PID B + delta-report JSON entries;
    every chunk carries {source, sheet, zone, element_id}. Answers must
    emit citations in a fixed format; post-validate that cited IDs exist
-   in the retrieved set; refuse when unsupported. CLI is sufficient.
+   in the retrieved set; refuse when unsupported. `answer()` is stateless
+   and takes a prebuilt index, so a caller owns session lifetime — that is
+   what let the web UI reuse it unchanged (decision 11).
 8. **Observability is homegrown** (`src/observability/`): context-manager
    spans, correlation id per request, per-span timings, LLM spans capture
    prompt/response/model/tokens/cost, JSONL structured logs, one JSON
@@ -67,6 +69,20 @@ eval harness are first-class requirements, not extras. Depth over breadth.
    ODA/LibreDWG→DXF→ezdxf path), cut in favour of depth on the OCR path.
 10. **LLM behind one interface** (`src/chat/llm.py`), provider/model from
     env, keys never committed, prompt caching for the two-document context.
+11. **The web UI is a presentation layer, not a second engine**
+    (`src/web/`). It calls the same `compute_deltas` the CLI and the eval
+    scorecard call, and renders `markup/payload.py::build_payload` — the
+    same function that produces the JSON embedded in the downloadable
+    `report.html`, so the browser view and the offline file cannot drift
+    (pinned by `tests/test_markup_payload.py`). It does *not* reuse
+    `cli._run_pipeline`, which prints refusals to stderr and returns an int
+    exit code; a browser needs the structured `PrecheckResult` to explain a
+    refusal and offer an override. Frontend is dependency-free vanilla JS
+    served as static files — no Node, no build step — with pdf.js vendored
+    for vector-crisp zoom. Boxes stay normalized `[0,1]` all the way to the
+    browser and are laid out as CSS percentages, so no second coordinate
+    system exists alongside `overlay.py` and `pdf_annotate.py`. Single-user
+    and localhost-bound by design: in-process job store, no auth.
 
 ## Dataset
 

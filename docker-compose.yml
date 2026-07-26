@@ -1,13 +1,15 @@
 # Zero-config entry points for the common flows.
 #
+#   docker compose up web              # browser UI at http://localhost:8000
 #   docker compose run --rm demo       # delta report on a real vendor pair
 #   docker compose run --rm eval       # deterministic scorecard
 #   docker compose run --rm chat       # grounded chat        (needs .env)
 #   docker compose run --rm eval-full  # full scorecard       (needs .env)
 #   docker compose run --rm shell      # poke around
 #
-# `run --rm`, not `up`: these are one-shot commands that print and exit, not
-# long-lived services.
+# `web` is the one long-lived service and the only one you `up` -- it serves
+# a UI and waits. Everything else is `run --rm`: one-shot commands that print
+# and exit.
 #
 # Deliberately NO bind mounts on the default services. The image runs as a
 # non-root user (uid 1000), and a host directory owned by a different uid --
@@ -26,6 +28,26 @@ x-base: &base
   image: delta-chat:latest
 
 services:
+  # The browser UI. Upload two PDFs (or click a bundled sample) and get the
+  # annotated drawings, the change list, chat and the raw JSON in one page.
+  #
+  # `required: false` because unlike `chat`, this service is useful with no
+  # credential at all -- everything works except the Ask tab, which says so
+  # rather than failing on the first question. Change detection is fully
+  # deterministic and never calls a model. A bare `env_file: [.env]` would
+  # refuse to start for anyone who has not created one.
+  #
+  # Binds 0.0.0.0 INSIDE the container -- the only address the port publish
+  # can reach -- but publishes to 127.0.0.1 on the host, so it is not exposed
+  # to your network. There is no authentication.
+  web:
+    <<: *base
+    env_file:
+      - path: .env
+        required: false
+    ports: ["127.0.0.1:8000:8000"]
+    command: ["uv", "run", "uvicorn", "src.web.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
   # The DEMO.md walkthrough: a real vendor revision pair -> delta report,
   # printed to stdout. No credential, no mount, no arguments.
   # NB: keep this a single-line string. A YAML folded scalar (`>`) only folds
