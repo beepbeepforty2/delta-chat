@@ -461,3 +461,7 @@ def test_index_is_served(client):
 def test_static_assets_are_served(client):
     assert client.get("/static/app.css").status_code == 200
     assert client.get("/static/app.js").status_code == 200
+    # app.js imports these two as ES modules; a 404 on either leaves the page
+    # blank with only a console error to show for it.
+    assert client.get("/static/md.js").status_code == 200
+    assert client.get("/static/vendor/pdfjs/pdf.min.mjs").status_code == 200

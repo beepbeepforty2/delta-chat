@@ -319,6 +319,20 @@ aside { background: var(--surface); display: flex; flex-direction: column; overf
   padding: 8px 12px; border-radius: 12px 12px 3px 12px;
 }
 .msg.a { background: var(--surface-2); border: 1px solid var(--border); padding: 10px 12px; border-radius: 12px 12px 12px 3px; }
+/* Chat answers arrive as Markdown (see md.js). Tight vertical rhythm --
+   these sit in a 390px sidebar, not an article column. */
+.msg.a p { margin: 0 0 8px; }
+.msg.a p:last-child { margin-bottom: 0; }
+.msg.a ol, .msg.a ul { margin: 0 0 8px; padding-left: 20px; }
+.msg.a ol:last-child, .msg.a ul:last-child { margin-bottom: 0; }
+.msg.a li { margin-bottom: 5px; }
+.msg.a li:last-child { margin-bottom: 0; }
+.msg.a li::marker { color: var(--muted); font-variant-numeric: tabular-nums; }
+.msg.a strong { font-weight: 650; color: var(--ink); }
+.msg.a code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px;
+  background: var(--surface-3); padding: 1px 4px; border-radius: 3px; word-break: break-all;
+}
 .msg.a.refused { border-color: var(--warn); background: var(--warn-wash); }
 .msg .refused-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--warn); display: block; margin-bottom: 4px; }
 .msg.thinking { color: var(--muted); font-style: italic; }

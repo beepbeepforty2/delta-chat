@@ -34,6 +34,7 @@ import { chromium } from "playwright-core";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { renderMarkdown } from "../src/web/static/md.js";
 
 // Override with CHROME_PATH= for a non-default install or another platform.
 const CHROME = process.env.CHROME_PATH ||
@@ -47,6 +48,38 @@ const check = (name, pass, detail = "") => {
   results.push({ name, pass, detail });
   console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? "  — " + detail : ""}`);
 };
+
+// ── markdown renderer: deterministic, no browser and no LLM needed ──────
+// Chat answers are Markdown, so these run first and fail fast: a bug here
+// would otherwise only show up as an oddly-formatted live answer.
+{
+  const md = renderMarkdown;
+  check("md: bold", md("a **b** c") === "<p>a <strong>b</strong> c</p>");
+  check("md: inline code", md("use `AC21` here") === "<p>use <code>AC21</code> here</p>");
+  check("md: ordered list",
+        md("1. one\n2. two") === "<ol><li>one</li><li>two</li></ol>");
+  check("md: bullet list", md("- one\n- two") === "<ul><li>one</li><li>two</li></ul>");
+  check("md: blank-line-separated items keep their numbering",
+        md("2. two\n\n3. three") === '<ol start="2"><li>two</li></ol><ol start="3"><li>three</li></ol>');
+  check("md: wrapped list item stays one item",
+        md("1. a long\n   continuation") === "<ol><li>a long continuation</li></ol>");
+  check("md: paragraphs split on blank lines",
+        md("one\n\ntwo") === "<p>one</p><p>two</p>");
+  check("md: single newline is a line break",
+        md("one\ntwo") === "<p>one<br>two</p>");
+  // The domain-safety rules. Underscores are everywhere in P&ID field names
+  // and must never be read as emphasis.
+  check("md: underscores in field names survive",
+        md("note_deleted note_no changed") === "<p>note_deleted note_no changed</p>");
+  check("md: __double underscore__ is not bold",
+        md("__x__") === "<p>__x__</p>");
+  check("md: lone asterisk is left alone", md('3/4"* mark').includes('3/4"* mark'));
+  // Citation markers must pass through untouched for chip substitution.
+  check("md: citation marker survives",
+        md("see [delta:1:F-8:delta0009].").includes("[delta:1:F-8:delta0009]"));
+  check("md: escaped entities are not re-mangled",
+        md("a &amp; b") === "<p>a &amp; b</p>");
+}
 
 const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 2 });
@@ -207,6 +240,14 @@ await page.screenshot({ path: `${OUT}/08-answer.png` });
 const chips = await page.locator(".cite").count();
 check("chat answered", (await page.locator(".msg.a").count()) >= 1);
 check("citation chips rendered", chips > 0, `${chips} chip(s)`);
+
+// The answer must not arrive as one run-on paragraph of literal asterisks.
+const answer = await page.locator(".msg.a").last().innerHTML();
+check("answer has no literal markdown left", !answer.includes("**"),
+      answer.includes("**") ? "found ** in rendered output" : "clean");
+const blocks = await page.locator(".msg.a").last()
+  .locator("p, li, strong, code").count();
+check("answer is formatted, not a run-on", blocks > 0, `${blocks} block/inline element(s)`);
 if (chips > 0) {
   const dead = await page.locator(".cite.dead").count();
   check("citation chips are live (not dead)", dead === 0, `${dead} dead of ${chips}`);

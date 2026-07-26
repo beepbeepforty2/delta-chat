@@ -20,6 +20,7 @@
  *    valve is worse than no chip.
  */
 import * as pdfjsLib from "/static/vendor/pdfjs/pdf.min.mjs";
+import { renderMarkdown } from "/static/md.js";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/static/vendor/pdfjs/pdf.worker.min.mjs";
 
@@ -706,11 +707,15 @@ function renderAnswer(res) {
   }
 }
 
-/** Replaces each inline `[A:1:F-7:el_…]` marker with a numbered chip. Uses
- *  the literal `raw` string the server echoed back rather than re-parsing,
- *  so the two can never disagree about what a marker was. */
+/** escape -> markdown -> chips, in that order.
+ *
+ *  Escaping first means the model's text can never inject markup. Markdown
+ *  second, because it must see the real `**` and newlines. Chips last, so
+ *  their markup is not re-escaped and the `[…]` markers survive the
+ *  Markdown pass intact (md.js implements no link syntax, for exactly this
+ *  reason). */
 function citationHtml(text, citations) {
-  let html = escapeHtml(text);
+  let html = renderMarkdown(escapeHtml(text));
   citations.forEach((c, i) => {
     const r = c.resolved;
     const title = r
