@@ -245,8 +245,22 @@ outranks a symbolic finding. That's the "symbolic classifies" half.
 
 ## Quick start
 
+The browser UI is the fastest way to see what this does:
+
 ```bash
 make install
+make web              # -> http://127.0.0.1:8000
+```
+
+Pick two PDFs (or click one of the bundled vendor drawings), press
+**Analyse**, and you get both revisions side by side with every change boxed
+on the drawing, a severity-ranked change list, a chat panel, and the raw
+JSON — all from one page. No credential needed except for the chat tab.
+See [Web UI](#web-ui) below.
+
+Everything is also available from the command line:
+
+```bash
 make dataset          # generates eval/datasets/v0 (seeded, reproducible)
 make run A=path/to/revA.pdf B=path/to/revB.pdf     # delta report
 make html-report A=path/to/revA.pdf B=path/to/revB.pdf  # + an interactive report.html
@@ -280,18 +294,99 @@ The scanned-PDF adapter needs the `tesseract` binary on `PATH` (a system
 dependency, not pip-installable): `brew install tesseract` on macOS,
 `apt install tesseract-ocr` on Debian/Ubuntu.
 
+## Web UI
+
+`make web` serves a single-page app at `http://127.0.0.1:8000` for the
+person who has to *review* a revision rather than build the engine.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ delta-chat    revA.pdf → revB.pdf     11 changes · 1 high · 10 low   │
+├──────────────────────────────┬───────────────────────────────────────┤
+│         Revision A           │  Revision B  │ Changes │ Ask │ Data   │
+│  ┌────────────────────────┐  │ ┌──────────┐ │ ───────────────────────│
+│  │  pdf.js canvas         │  │ │ pdf.js   │ │ HIGH                   │
+│  │  + change boxes        │  │ │ + boxes  │ │ line_tag pipe_class    │
+│  └────────────────────────┘  │ └──────────┘ │ AC21 → AC31            │
+│   Sheet 1   − 100% + ⤢   🔒 lock panes      │ sheet 1 · zone F-8     │
+└──────────────────────────────┴───────────────────────────────────────┘
+```
+
+- **Both revisions, side by side**, rendered with pdf.js so zooming to read
+  a tag stays vector-crisp rather than pixelating. Panning one pane pans the
+  other; every change is boxed and coloured by kind.
+- **Changes** — severity-ranked, filterable by kind and free text, knock-on
+  (cascade) changes hidden by default. Click a row to jump to it on both
+  drawings, or a box to jump to its row. Each row expands to its raw `Delta`.
+- **Ask** — the same grounded chat as `make chat`. Citations render as
+  numbered chips; clicking one highlights the region on the drawing it
+  refers to. Needs an LLM credential; without one the tab says so instead
+  of failing on the first question.
+- **Data** — the pretty-printed `delta_report.json`, plus downloads for the
+  Markdown report, the standalone `report.html`, and both annotated PDFs.
+
+Two behaviours worth calling out, because they are the ones a GUI is most
+tempted to hide:
+
+- If the two files aren't revisions of the same drawing, the UI **refuses**
+  and shows the evidence — both drawing numbers and equipment tags — with an
+  **Analyse anyway** override for the case where the engineer knows better
+  than the heuristic. The override does not erase the warning.
+- If the pair was matched on weak evidence (`identity_tier` of `tag_overlap`
+  or `none`), a banner says so for the whole session. The CLI prints this to
+  stderr; dropping it in a GUI would be quietly claiming more confidence
+  than the pipeline has.
+
+The web layer computes nothing. Every delta, box, severity and colour comes
+from `payload.build_payload`, which is also what produces the JSON embedded
+in the downloadable `report.html`; the pipeline behind it is the same
+`compute_deltas` the CLI and the eval scorecard call. `tests/test_web_app.py`
+asserts the browser and `make run` report identical deltas on the same pair.
+
+The server lives behind an optional `web` extra, so a bare `uv sync` installs
+the CLI and eval harness without uvicorn and its transitive stack.
+`make install` (`uv sync --extra dev`) includes it, as does the Docker image,
+and `make web` requests it explicitly — so in practice you never think about
+it unless you deliberately installed the lean core.
+
+### Browser checks (`make uicheck`)
+
+`tests/test_web_app.py` can prove the API serves the right numbers; it
+cannot prove a human can see them. `tools/uicheck.mjs` drives the page in
+real Chrome and asserts the 28 things only a renderer can settle — that the
+pdf.js canvas paints actual ink, that overlay boxes land on the drawing and
+stay registered through zoom, that clicking a change highlights it in both
+panes *and* the sidebar, that locked panes pan together, that a citation
+chip jumps to its region, and that the console is clean.
+
+```bash
+make web                      # in another shell
+npm install playwright-core   # once: a driver, not a browser -- it uses your Chrome
+make uicheck                  # 28 checks + screenshots in tools/uicheck-shots/
+```
+
+Optional and deliberately outside `make test`: the application needs no Node
+and no build step, and the Python suite is complete without this. It is here
+because on its first run it caught three bugs that the Python tests and a
+careful code read both missed — a CSS grid item missing `min-height: 0` was
+clipping the bottom two-thirds of both drawings with no scrollbar to reach
+it; `escapeHtml` was turning every `"` into `&quot;` so the JSON view's
+highlighter matched nothing; and a missing favicon logged a console error on
+every load.
+
 ### Docker — zero-setup run
 
 Nothing to install but Docker itself. No Python, no `uv`, no `tesseract`,
 no credential, no dataset build, and **no volume mounts**:
 
 ```bash
+docker compose up web           # browser UI at http://localhost:8000
 docker compose run --rm demo    # real vendor revision pair -> delta report
 docker compose run --rm eval    # deterministic scorecard
 ```
 
 `demo` reproduces section 1 of [`DEMO.md`](DEMO.md) and prints the delta
-report to stdout. Both build the image on first use.
+report to stdout. All three build the image on first use.
 
 | Service | What it does | Credential |
 |---|---|---|
@@ -338,10 +433,11 @@ dependencies, since those live in the `uv`-managed `.venv`.
 
 #### Verified, and what verifying it caught
 
-The image builds and the services run — `docker build` passes with **339
-tests green inside the container**, and `docker compose run --rm demo` and
-`... eval` were both executed end to end. Building it for real immediately
-found two bugs that no amount of reading would have:
+The image builds and the services run — `docker build` passes with **393
+tests green inside the container**, and `docker compose run --rm demo`,
+`... eval` and `docker compose up web` were all executed end to end.
+Building it for real immediately found two bugs that no amount of reading
+would have:
 
 1. **`opencv-python` doesn't import in a slim image.** Every cv2-importing
    test failed collection with `ImportError: libGL.so.1: cannot open shared
@@ -766,8 +862,11 @@ src/
   cli.py         `run`/`chat`/`markup` subcommands
   chat/          retrieval (BM25 + domain aliases) over PID A + PID B +
                  delta report; llm.py (chat + judge backend seams); cited answers
-  markup/        overlay.py (raster PNG preview) + pdf_annotate.py (real PDF
-                 annotations, default)
+  markup/        payload.py (the delta payload both UIs render) +
+                 overlay.py (raster PNG preview) + pdf_annotate.py (real PDF
+                 annotations, default) + html_report.py (standalone report)
+  web/           FastAPI app + in-process job store + citation->bbox resolver;
+                 static/ is the no-build vanilla-JS frontend (`make web`)
   observability/ homegrown tracer: spans, correlation ids, LLM telemetry
 config/
   domain.yaml    BM25 query-alias table (chat retrieval)
@@ -786,12 +885,23 @@ docs/
   DEMO_SCRIPT.md                    shot list for the video walkthrough
 tools/
   compare_models.py     same pair, same credential, different model names
+  uicheck.mjs           optional browser checks of the web UI (`make uicheck`)
   visual_diff.py        human-in-the-loop debug viewer
   holdout/              builder for the held-out set (make_real_pair.py) and
                          its source/licensing notes
-tests/                  339 tests; `make test`
+tests/                  393 tests; `make test`
 ```
 
 Root: [`DESIGN.md`](DESIGN.md) (decisions of record, cited from source
 docstrings), [`DEMO.md`](DEMO.md) (walkthrough with real captured output),
 [`docs/findings.md`](docs/findings.md) (what broke and why).
+
+### Third-party code
+
+One vendored dependency, in `src/web/static/vendor/pdfjs/`:
+[**pdf.js**](https://mozilla.github.io/pdf.js/) 4.10.38 (Mozilla
+Foundation, Apache-2.0 — full licence text committed alongside it). It is
+committed rather than fetched at build time so the app works with no network
+and no Node toolchain, consistent with the rest of the repo. Everything else
+under `src/` is original; Python dependencies are declared in
+`pyproject.toml` and pinned in `uv.lock`.

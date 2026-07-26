@@ -26,6 +26,15 @@ eval/results/
 raster_cache/
 reports/
 traces/
+# per-job uploads + artifacts from `make web`; the job store is in-process,
+# so anything left here is from a previous run and is safe to delete.
+.web_jobs/
 
 # os cruft
 .DS_Store
+
+# optional browser-test harness (tools/uicheck.mjs) -- see its header
+tools/uicheck-shots/
+node_modules/
+package-lock.json
+package.json

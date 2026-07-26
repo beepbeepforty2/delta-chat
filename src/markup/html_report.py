@@ -22,97 +22,20 @@ adapters (see `overlay.py`'s own docstring), so plain percentages are
 correct with no pixel-size lookup needed -- simpler than `overlay.py`'s
 PIL path, which denormalizes to pixels because PIL draws server-side.
 
-Reuses `overlay.py::_index_elements`/`_collect_boxes` for delta -> element
--> bbox resolution, so this, the PNG overlay, and the PDF annotator all
-agree on WHAT gets a box; this module only adds WHERE the sidebar's
-metadata (severity, confidence, semantic_null, cascade) comes from, which
-neither of those two markup paths needed.
+Delta -> element -> bbox resolution and the record/summary shapes live in
+`payload.py`, shared verbatim with `src/web/` so the downloadable report
+and the live web UI can never disagree about what changed; this module is
+only the offline *rendering* of that payload (template, styles, and the
+base64 inlining that makes the file self-contained).
 """
 from __future__ import annotations
 
-import base64
 import json
 from pathlib import Path
 
 from src.canonical.model import CanonicalDocument
 from src.delta.model import Delta
-from src.delta.severity import SEVERITY_ORDER
-from src.markup.overlay import COLORS, _collect_boxes, _index_elements
-
-_KIND_LABELS = {
-    "add": "Added",
-    "remove": "Removed",
-    "modify": "Modified",
-    "move": "Moved",
-    "unclassified_visual_change": "Unclassified visual change",
-}
-
-
-def _bbox_list(el) -> list[float]:
-    b = el.bbox
-    return [b.x0, b.y0, b.x1, b.y1]
-
-
-def _bbox_obj_list(b) -> list[float]:
-    return [b.x0, b.y0, b.x1, b.y1]
-
-
-def _build_delta_records(deltas: list[Delta], boxes_a: dict, boxes_b: dict) -> list[dict]:
-    """One record per Delta (primary AND cascade -- the sidebar filters,
-    it doesn't pre-drop). `unclassified_visual_change` deltas have no
-    id_a/id_b by construction (raster_join.py finds pixels, not
-    elements), so they never resolve through the element-lookup path
-    (boxes_a/boxes_b) -- but raster_join.py DOES set bbox_a/bbox_b
-    directly on the Delta itself (the region it found), so that's used
-    as a fallback location. Only a Delta with genuinely neither (older
-    callers, or a future producer that doesn't set them) falls through
-    to the sidebar's "no exact location" note."""
-    box_a_by_did = {d.did: _bbox_list(el) for entries in boxes_a.values() for el, d in entries}
-    box_b_by_did = {d.did: _bbox_list(el) for entries in boxes_b.values() for el, d in entries}
-    records = []
-    for d in deltas:
-        box_a = box_a_by_did.get(d.did) or (_bbox_obj_list(d.bbox_a) if d.bbox_a is not None else None)
-        box_b = box_b_by_did.get(d.did) or (_bbox_obj_list(d.bbox_b) if d.bbox_b is not None else None)
-        records.append({
-            "did": d.did,
-            "kind": d.kind,
-            "element_type": d.element_type,
-            "sheet": d.sheet,
-            "zone": d.zone_b or d.zone_a or "?",
-            "severity": d.severity or "low",
-            "confidence": round(d.confidence, 2),
-            "description": d.description or "",
-            "is_cascade": d.is_cascade,
-            "primary_did": d.primary_did,
-            "semantic_null": d.semantic_null,
-            "semantic_null_reason": d.semantic_null_reason,
-            "visual_change_kind": d.visual_change_kind,
-            "box_a": box_a,
-            "box_b": box_b,
-        })
-    return records
-
-
-def _b64_png(path: str) -> str:
-    return base64.b64encode(Path(path).read_bytes()).decode("ascii")
-
-
-def _build_sheets(doc_a: CanonicalDocument, doc_b: CanonicalDocument) -> list[dict]:
-    sheet_nos = sorted(set(doc_a.raster_paths) | set(doc_b.raster_paths))
-    sheets = []
-    for n in sheet_nos:
-        sheets.append({
-            "number": n,
-            "img_a": _b64_png(doc_a.raster_paths[n]) if n in doc_a.raster_paths else None,
-            "img_b": _b64_png(doc_b.raster_paths[n]) if n in doc_b.raster_paths else None,
-        })
-    return sheets
-
-
-def _kind_hex(kind: str) -> str:
-    r, g, b = COLORS[kind]
-    return f"#{r:02x}{g:02x}{b:02x}"
-
+from src.markup.payload import KIND_LABELS, build_payload, kind_color_map
 
 HTML_TEMPLATE = """<!doctype html>
 <html>
@@ -458,29 +381,14 @@ def render_html_report(doc_a: CanonicalDocument, doc_b: CanonicalDocument, delta
     """Writes a single self-contained HTML file to out_path (base64-inlined
     rasters, no external assets, opens directly from disk). pid_a_label/
     pid_b_label are display names only (e.g. the --a/--b paths passed to
-    the CLI) -- everything else comes straight off doc_a/doc_b/deltas."""
-    els_a, els_b = _index_elements(doc_a), _index_elements(doc_b)
-    boxes_a, boxes_b = _collect_boxes(deltas, els_a, els_b)
-    records = _build_delta_records(deltas, boxes_a, boxes_b)
-    sheets = _build_sheets(doc_a, doc_b)
+    the CLI) -- everything else comes straight off doc_a/doc_b/deltas.
 
-    primary = [d for d in deltas if not d.is_cascade]
-    severity_counts = {sev: sum(1 for d in primary if d.severity == sev) for sev in SEVERITY_ORDER}
-
-    data = {
-        "pid_a": pid_a_label,
-        "pid_b": pid_b_label,
-        "sheets": sheets,
-        "deltas": records,
-        "summary": {
-            "n_primary": len(primary),
-            "n_cascade": sum(1 for d in deltas if d.is_cascade),
-            "severity_counts": severity_counts,
-            "n_semantic_null": sum(1 for d in primary if d.semantic_null),
-        },
-    }
-    kind_color = {kind: _kind_hex(kind) for kind in COLORS}
-    kind_label = dict(_KIND_LABELS)
+    inline_images=True is what makes the output self-contained: each
+    sheet's L0 raster is base64'd into the file, so it survives being
+    emailed with no server and no sibling assets."""
+    data = build_payload(doc_a, doc_b, deltas, pid_a_label, pid_b_label, inline_images=True)
+    kind_color = kind_color_map()
+    kind_label = dict(KIND_LABELS)
 
     html = (HTML_TEMPLATE
             .replace("__TITLE__", f"{pid_a_label} vs {pid_b_label}")
