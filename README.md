@@ -343,6 +343,12 @@ in the downloadable `report.html`; the pipeline behind it is the same
 `compute_deltas` the CLI and the eval scorecard call. `tests/test_web_app.py`
 asserts the browser and `make run` report identical deltas on the same pair.
 
+The server lives behind an optional `web` extra, so a bare `uv sync` installs
+the CLI and eval harness without uvicorn and its transitive stack.
+`make install` (`uv sync --extra dev`) includes it, as does the Docker image,
+and `make web` requests it explicitly — so in practice you never think about
+it unless you deliberately installed the lean core.
+
 ### Browser checks (`make uicheck`)
 
 `tests/test_web_app.py` can prove the API serves the right numbers; it
