@@ -32,3 +32,9 @@ traces/
 
 # os cruft
 .DS_Store
+
+# optional browser-test harness (tools/uicheck.mjs) -- see its header
+tools/uicheck-shots/
+node_modules/
+package-lock.json
+package.json

@@ -343,6 +343,31 @@ in the downloadable `report.html`; the pipeline behind it is the same
 `compute_deltas` the CLI and the eval scorecard call. `tests/test_web_app.py`
 asserts the browser and `make run` report identical deltas on the same pair.
 
+### Browser checks (`make uicheck`)
+
+`tests/test_web_app.py` can prove the API serves the right numbers; it
+cannot prove a human can see them. `tools/uicheck.mjs` drives the page in
+real Chrome and asserts the 28 things only a renderer can settle — that the
+pdf.js canvas paints actual ink, that overlay boxes land on the drawing and
+stay registered through zoom, that clicking a change highlights it in both
+panes *and* the sidebar, that locked panes pan together, that a citation
+chip jumps to its region, and that the console is clean.
+
+```bash
+make web                      # in another shell
+npm install playwright-core   # once: a driver, not a browser -- it uses your Chrome
+make uicheck                  # 28 checks + screenshots in tools/uicheck-shots/
+```
+
+Optional and deliberately outside `make test`: the application needs no Node
+and no build step, and the Python suite is complete without this. It is here
+because on its first run it caught three bugs that the Python tests and a
+careful code read both missed — a CSS grid item missing `min-height: 0` was
+clipping the bottom two-thirds of both drawings with no scrollbar to reach
+it; `escapeHtml` was turning every `"` into `&quot;` so the JSON view's
+highlighter matched nothing; and a missing favicon logged a console error on
+every load.
+
 ### Docker — zero-setup run
 
 Nothing to install but Docker itself. No Python, no `uv`, no `tesseract`,
@@ -854,6 +879,7 @@ docs/
   DEMO_SCRIPT.md                    shot list for the video walkthrough
 tools/
   compare_models.py     same pair, same credential, different model names
+  uicheck.mjs           optional browser checks of the web UI (`make uicheck`)
   visual_diff.py        human-in-the-loop debug viewer
   holdout/              builder for the held-out set (make_real_pair.py) and
                          its source/licensing notes

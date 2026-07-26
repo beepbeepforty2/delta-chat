@@ -767,8 +767,15 @@ async function loadJsonView() {
   $("#jsonview").innerHTML = highlightJson(text);
 }
 
+/** Escapes only the three characters that can break out of a text node.
+ *  Deliberately NOT escapeHtml: that turns `"` into `&quot;`, after which
+ *  the string pattern below matches nothing and the whole view renders
+ *  unhighlighted. Quotes need escaping in attribute values, not in text. */
+const escapeText = (s) =>
+  String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
 function highlightJson(text) {
-  return escapeHtml(text).replace(
+  return escapeText(text).replace(
     /("(?:\\.|[^"\\])*"\s*:?)|(\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b)|(\btrue\b|\bfalse\b)|(\bnull\b)/g,
     (m, str, num, bool, nul) => {
       if (str) return `<span class="j-${str.trimEnd().endsWith(":") ? "key" : "str"}">${str}</span>`;
